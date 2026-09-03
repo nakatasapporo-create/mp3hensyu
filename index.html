@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MP3トリミング＆フェードアウト</title>
+  <style>
+    :root{
+      --bg:#f5f7fb;
+      --card:#ffffff;
+      --text:#1f2937;
+      --muted:#6b7280;
+      --line:#d1d5db;
+      --accent:#2563eb;
+      --accent2:#1d4ed8;
+      --ok:#059669;
+      --danger:#dc2626;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    .wrap{
+      max-width:920px;
+      margin:0 auto;
+      padding:24px 16px 40px;
+    }
+    h1{
+      font-size:clamp(1.6rem,4vw,2.3rem);
+      margin:0 0 8px;
+    }
+    .lead{
+      margin:0 0 20px;
+      color:var(--muted);
+      line-height:1.7;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid #e5e7eb;
+      border-radius:18px;
+      padding:18px;
+      box-shadow:0 8px 28px rgba(0,0,0,.06);
+      margin-bottom:16px;
+    }
+    .filebox{
+      border:2px dashed #b8c2d0;
+      border-radius:14px;
+      padding:22px;
+      text-align:center;
+      background:#fafcff;
+    }
+    input[type=file]{max-width:100%}
+    .meta{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
+      gap:10px;
+      margin-top:14px;
+    }
+    .pill{
+      background:#f3f4f6;
+      padding:10px 12px;
+      border-radius:10px;
+      font-size:.95rem;
+    }
+    audio{
+      width:100%;
+      margin-top:16px;
+    }
+    .controls{
+      display:grid;
+      grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+      gap:14px;
+      margin-top:10px;
+    }
+    label{
+      display:block;
+      font-weight:700;
+      margin-bottom:6px;
+    }
+    input[type=number], input[type=text]{
+      width:100%;
+      padding:11px 12px;
+      border:1px solid var(--line);
+      border-radius:10px;
+      font-size:1rem;
+    }
+    input[type=range]{
+      width:100%;
+    }
+    .sub{
+      color:var(--muted);
+      font-size:.88rem;
+      margin-top:5px;
+    }
+    .timeline{
+      margin-top:14px;
+      padding:12px;
+      background:#f8fafc;
+      border-radius:12px;
+      border:1px solid #e5e7eb;
+    }
+    .timeline-row{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      font-size:.9rem;
+      color:var(--muted);
+      margin-bottom:6px;
+    }
+    .bar{
+      position:relative;
+      height:16px;
+      background:#dbeafe;
+      border-radius:999px;
+      overflow:hidden;
+    }
+    .kept{
+      position:absolute;
+      top:0;bottom:0;
+      background:#60a5fa;
+    }
+    .fade{
+      position:absolute;
+      top:0;bottom:0;
+      background:linear-gradient(90deg,rgba(37,99,235,.85),rgba(37,99,235,.1));
+    }
+    .buttons{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:16px;
+    }
+    button, .download{
+      appearance:none;
+      border:0;
+      border-radius:11px;
+      padding:11px 16px;
+      font-weight:800;
+      cursor:pointer;
+      font-size:.98rem;
+      text-decoration:none;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .primary{background:var(--accent);color:white}
+    .primary:hover{background:var(--accent2)}
+    .secondary{background:#e5e7eb;color:#111827}
+    .success{background:var(--ok);color:white}
+    button:disabled{opacity:.5;cursor:not-allowed}
+    .status{
+      margin-top:14px;
+      padding:11px 12px;
+      border-radius:10px;
+      background:#eef2ff;
+      color:#3730a3;
+      display:none;
+      white-space:pre-wrap;
+    }
+    .status.error{background:#fef2f2;color:#991b1b}
+    .status.ok{background:#ecfdf5;color:#065f46}
+    progress{
+      width:100%;
+      height:16px;
+      margin-top:12px;
+      display:none;
+    }
+    .note{
+      font-size:.9rem;
+      color:var(--muted);
+      line-height:1.6;
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>MP3トリミング＆フェードアウト</h1>
+  <p class="lead">MP3やiPadボイスメモのM4Aをブラウザ内で編集します。ファイルはサーバーへ送信せず、端末内で処理します。</p>
+
+  <div class="card">
+    <div class="filebox">
+      <strong>MP3 / M4Aファイルを選択</strong><br><br>
+      <input id="fileInput" type="file" accept="audio/*,.mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a">
+    </div>
+    <div id="meta" class="meta" style="display:none">
+      <div class="pill">ファイル名: <span id="fileName">-</span></div>
+      <div class="pill">長さ: <span id="durationText">-</span></div>
+      <div class="pill">サイズ: <span id="fileSize">-</span></div>
+    </div>
+    <audio id="audio" controls></audio>
+  </div>
+
+  <div class="card">
+    <div class="controls">
+      <div>
+        <label for="startTime">開始位置（秒）</label>
+        <input id="startTime" type="number" min="0" step="0.1" value="0">
+        <div class="sub">ここより前をカットします。</div>
+      </div>
+      <div>
+        <label for="endTime">終了位置（秒）</label>
+        <input id="endTime" type="number" min="0" step="0.1" value="0">
+        <div class="sub">ここより後ろをカットします。</div>
+      </div>
+      <div>
+        <label for="fadeTime">フェードアウト（秒）</label>
+        <input id="fadeTime" type="number" min="0" step="0.1" value="3">
+        <div class="sub">切り出した音声の末尾に適用します。</div>
+      </div>
+      <div>
+        <label for="normalize">ノーマライズ</label>
+        <div style="padding:10px 0">
+          <label style="font-weight:600;display:flex;align-items:center;gap:8px">
+            <input id="normalize" type="checkbox" checked>
+            音量を自動調整する
+          </label>
+        </div>
+        <div class="sub">最大ピークを約 -1 dBFS に合わせます。</div>
+      </div>
+    </div>
+
+    <div class="buttons">
+      <button id="setStart" class="secondary" disabled>再生位置を開始に設定</button>
+      <button id="setEnd" class="secondary" disabled>再生位置を終了に設定</button>
+      <button id="preview" class="secondary" disabled>範囲をプレビュー</button>
+    </div>
+
+    <div class="timeline">
+      <div class="timeline-row">
+        <span>0:00</span>
+        <span id="timelineInfo">ファイルを選択してください</span>
+        <span id="timelineEnd">0:00</span>
+      </div>
+      <div class="bar">
+        <div id="keptBar" class="kept" style="left:0%;width:0%"></div>
+        <div id="fadeBar" class="fade" style="left:0%;width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label for="outputName">保存ファイル名</label>
+    <input id="outputName" type="text" value="trimmed_fadeout.mp3">
+
+    <div class="buttons">
+      <button id="processBtn" class="primary" disabled>MP3を書き出す</button>
+      <a id="downloadLink" class="download success" style="display:none">MP3をダウンロード</a>
+    </div>
+    <progress id="progress" max="100" value="0"></progress>
+    <div id="status" class="status"></div>
+
+    <p class="note">
+      ※ MP3/M4Aの読み込みはブラウザの音声デコード機能を使い、書き出しはMP3になります。MP3書き出しにはブラウザ上で動く lamejs を利用します。最初の読み込み時にCDNへ接続します。
+      学校などCDNがブロックされる環境では、lame.min.js を同じフォルダに置く構成へ変更できます。
+    </p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const fileInput = $('fileInput');
+  const audio = $('audio');
+  const startTime = $('startTime');
+  const endTime = $('endTime');
+  const fadeTime = $('fadeTime');
+  const processBtn = $('processBtn');
+  const previewBtn = $('preview');
+  const setStart = $('setStart');
+  const setEnd = $('setEnd');
+  const status = $('status');
+  const progress = $('progress');
+  const downloadLink = $('downloadLink');
+  const outputName = $('outputName');
+  const normalize = $('normalize');
+
+  let currentFile = null;
+  let audioBuffer = null;
+  let objectUrl = null;
+  let previewTimer = null;
+
+  function fmt(sec){
+    if (!Number.isFinite(sec)) return '0:00';
+    const m = Math.floor(sec/60);
+    const s = Math.floor(sec%60).toString().padStart(2,'0');
+    return `${m}:${s}`;
+  }
+
+  function showStatus(text, type=''){
+    status.style.display = 'block';
+    status.className = 'status' + (type ? ' ' + type : '');
+    status.textContent = text;
+  }
+
+  function updateTimeline(){
+    const dur = audioBuffer?.duration || 0;
+    const s = Math.max(0, Number(startTime.value) || 0);
+    const e = Math.min(dur, Number(endTime.value) || 0);
+    const f = Math.max(0, Number(fadeTime.value) || 0);
+    const left = dur ? (s/dur)*100 : 0;
+    const width = dur ? Math.max(0, (e-s)/dur)*100 : 0;
+    const fadeActual = Math.min(f, Math.max(0,e-s));
+    const fadeLeft = dur ? ((e-fadeActual)/dur)*100 : 0;
+    const fadeWidth = dur ? (fadeActual/dur)*100 : 0;
+    $('keptBar').style.left = left + '%';
+    $('keptBar').style.width = width + '%';
+    $('fadeBar').style.left = fadeLeft + '%';
+    $('fadeBar').style.width = fadeWidth + '%';
+    $('timelineEnd').textContent = fmt(dur);
+    $('timelineInfo').textContent = dur ? `使用範囲 ${fmt(s)} ～ ${fmt(e)} / フェード ${fadeActual.toFixed(1)}秒` : 'ファイルを選択してください';
+  }
+
+  [startTime,endTime,fadeTime].forEach(el => el.addEventListener('input', updateTimeline));
+
+  fileInput.addEventListener('change', async () => {
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    currentFile = file;
+    downloadLink.style.display = 'none';
+    showStatus('MP3を読み込んでいます…');
+
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+    objectUrl = URL.createObjectURL(file);
+    audio.src = objectUrl;
+
+    try{
+      const arrayBuffer = await file.arrayBuffer();
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
+      await ctx.close();
+
+      startTime.value = '0';
+      endTime.value = audioBuffer.duration.toFixed(1);
+      fadeTime.value = Math.min(3, audioBuffer.duration).toFixed(1);
+
+      $('fileName').textContent = file.name;
+      $('durationText').textContent = fmt(audioBuffer.duration) + ` (${audioBuffer.duration.toFixed(2)}秒)`;
+      $('fileSize').textContent = (file.size/1024/1024).toFixed(2) + ' MB';
+      $('meta').style.display = 'grid';
+
+      const base = file.name.replace(/\.(mp3|m4a)$/i,'');
+      outputName.value = base + '_trim_fade.mp3';
+
+      [processBtn,previewBtn,setStart,setEnd].forEach(b => b.disabled = false);
+      updateTimeline();
+      showStatus('読み込み完了です。開始・終了位置とフェード時間を設定してください。','ok');
+    }catch(err){
+      console.error(err);
+      showStatus('音声の読み込みに失敗しました。このM4A/MP3をブラウザがデコードできない可能性があります。iPadのボイスメモM4Aは通常Safariで読み込めます。','error');
+    }
+  });
+
+  setStart.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    startTime.value = Math.min(audio.currentTime, audioBuffer.duration).toFixed(1);
+    updateTimeline();
+  });
+
+  setEnd.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    endTime.value = Math.min(audio.currentTime, audioBuffer.duration).toFixed(1);
+    updateTimeline();
+  });
+
+  previewBtn.addEventListener('click', async () => {
+    if (!audioBuffer) return;
+    const s = Number(startTime.value);
+    const e = Number(endTime.value);
+    if (!(e > s)) {
+      showStatus('終了位置は開始位置より後にしてください。','error');
+      return;
+    }
+    clearInterval(previewTimer);
+    audio.currentTime = s;
+    await audio.play();
+    previewTimer = setInterval(() => {
+      if (audio.currentTime >= e || audio.ended) {
+        audio.pause();
+        clearInterval(previewTimer);
+      }
+    }, 50);
+  });
+
+  function floatTo16BitPCM(float32Array){
+    const out = new Int16Array(float32Array.length);
+    for(let i=0;i<float32Array.length;i++){
+      const s = Math.max(-1, Math.min(1, float32Array[i]));
+      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+    }
+    return out;
+  }
+
+  processBtn.addEventListener('click', async () => {
+    if (!audioBuffer) return;
+    if (typeof lamejs === 'undefined'){
+      showStatus('MP3エンコーダー(lamejs)を読み込めませんでした。インターネット接続またはCDN制限を確認してください。','error');
+      return;
+    }
+
+    let s = Number(startTime.value);
+    let e = Number(endTime.value);
+    let f = Number(fadeTime.value);
+
+    if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(f)){
+      showStatus('数値を正しく入力してください。','error');
+      return;
+    }
+    s = Math.max(0,s);
+    e = Math.min(audioBuffer.duration,e);
+    if (e <= s){
+      showStatus('終了位置は開始位置より後にしてください。','error');
+      return;
+    }
+    f = Math.max(0, Math.min(f, e-s));
+
+    processBtn.disabled = true;
+    progress.style.display = 'block';
+    progress.value = 5;
+    downloadLink.style.display = 'none';
+    showStatus('音声を切り出しています…');
+
+    try{
+      const sr = audioBuffer.sampleRate;
+      const startSample = Math.floor(s * sr);
+      const endSample = Math.floor(e * sr);
+      const length = endSample - startSample;
+      const channels = Math.min(2, audioBuffer.numberOfChannels);
+
+      let left = new Float32Array(length);
+      let right = channels > 1 ? new Float32Array(length) : null;
+
+      left.set(audioBuffer.getChannelData(0).subarray(startSample,endSample));
+      if (channels > 1){
+        right.set(audioBuffer.getChannelData(1).subarray(startSample,endSample));
+      }
+
+      progress.value = 20;
+      showStatus('フェードアウトを適用しています…');
+
+      const fadeSamples = Math.floor(f * sr);
+      if (fadeSamples > 0){
+        const fadeStart = length - fadeSamples;
+        for(let i=0;i<fadeSamples;i++){
+          const gain = 1 - (i / fadeSamples);
+          const idx = fadeStart + i;
+          left[idx] *= gain;
+          if (right) right[idx] *= gain;
+        }
+      }
+
+      if (normalize.checked){
+        showStatus('ノーマライズを適用しています…');
+        let peak = 0;
+        for(let i=0;i<left.length;i++){
+          const a = Math.abs(left[i]);
+          if (a > peak) peak = a;
+        }
+        if (right){
+          for(let i=0;i<right.length;i++){
+            const a = Math.abs(right[i]);
+            if (a > peak) peak = a;
+          }
+        }
+        if (peak > 0){
+          const targetPeak = Math.pow(10, -1/20); // 約 -1 dBFS
+          const gain = Math.min(targetPeak / peak, 8); // 過度な増幅を抑える
+          for(let i=0;i<left.length;i++) left[i] *= gain;
+          if (right) for(let i=0;i<right.length;i++) right[i] *= gain;
+        }
+      }
+
+      const left16 = floatTo16BitPCM(left);
+      const right16 = right ? floatTo16BitPCM(right) : null;
+
+      progress.value = 35;
+      showStatus('MP3へ変換しています…');
+
+      const kbps = 192;
+      const encoder = new lamejs.Mp3Encoder(channels, sr, kbps);
+      const mp3Data = [];
+      const blockSize = 1152;
+
+      for(let i=0;i<left16.length;i+=blockSize){
+        const l = left16.subarray(i, i+blockSize);
+        let buf;
+        if (channels === 2){
+          const r = right16.subarray(i, i+blockSize);
+          buf = encoder.encodeBuffer(l,r);
+        }else{
+          buf = encoder.encodeBuffer(l);
+        }
+        if (buf.length) mp3Data.push(new Int8Array(buf));
+        if (i % (blockSize*50) === 0){
+          progress.value = 35 + Math.min(55, Math.floor((i/left16.length)*55));
+          await new Promise(r => setTimeout(r,0));
+        }
+      }
+
+      const endBuf = encoder.flush();
+      if (endBuf.length) mp3Data.push(new Int8Array(endBuf));
+
+      progress.value = 95;
+      const blob = new Blob(mp3Data, {type:'audio/mpeg'});
+      const url = URL.createObjectURL(blob);
+
+      let name = outputName.value.trim() || 'trimmed_fadeout.mp3';
+      if (!name.toLowerCase().endsWith('.mp3')) name += '.mp3';
+
+      downloadLink.href = url;
+      downloadLink.download = name;
+      downloadLink.textContent = `MP3をダウンロード（${(blob.size/1024/1024).toFixed(2)} MB）`;
+      downloadLink.style.display = 'inline-flex';
+
+      progress.value = 100;
+      showStatus(`完成しました。\n長さ: ${(e-s).toFixed(2)}秒 / フェードアウト: ${f.toFixed(2)}秒 / ノーマライズ: ${normalize.checked ? 'ON' : 'OFF'} / 192kbps MP3`,'ok');
+    }catch(err){
+      console.error(err);
+      showStatus('処理中にエラーが発生しました: ' + (err?.message || err),'error');
+    }finally{
+      processBtn.disabled = false;
+    }
+  });
+
+  window.addEventListener('beforeunload', () => {
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  });
+})();
+</script>
+</body>
+</html>
