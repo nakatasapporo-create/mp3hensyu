@@ -234,7 +234,7 @@
       </div>
       <canvas id="waveCanvas" width="1200" height="300"></canvas>
       <div class="wave-help">
-        青いハンドル＝残す範囲、赤いハンドル＝途中から削除する範囲です。iPadでは指でドラッグできます。
+        青いハンドル＝残す範囲、赤＝カット1、オレンジ＝カット2です。iPadでは指でドラッグできます。
       </div>
     </div>
 
@@ -272,18 +272,23 @@
     <div class="timeline" style="margin-top:18px">
       <label style="display:flex;align-items:center;gap:9px">
         <input id="cutEnabled" type="checkbox">
-        途中の不要部分をカットする
+        途中の不要部分を2カ所カットする
       </label>
       <div id="cutControls" class="controls" style="display:none">
-        <div><label for="cutStart">カット開始（秒）</label><input id="cutStart" type="number" min="0" step="0.1" value="0"><div class="sub">ここから削除します。</div></div>
-        <div><label for="cutEnd">カット終了（秒）</label><input id="cutEnd" type="number" min="0" step="0.1" value="0"><div class="sub">ここまで削除します。</div></div>
+        <div><label for="cutStart">カット1 開始（秒）</label><input id="cutStart" type="number" min="0" step="0.1" value="0"><div class="sub">赤い範囲の開始です。</div></div>
+        <div><label for="cutEnd">カット1 終了（秒）</label><input id="cutEnd" type="number" min="0" step="0.1" value="0"><div class="sub">赤い範囲の終了です。</div></div>
+        <div><label for="cut2Start">カット2 開始（秒）</label><input id="cut2Start" type="number" min="0" step="0.1" value="0"><div class="sub">オレンジ色の範囲の開始です。</div></div>
+        <div><label for="cut2End">カット2 終了（秒）</label><input id="cut2End" type="number" min="0" step="0.1" value="0"><div class="sub">オレンジ色の範囲の終了です。</div></div>
       </div>
       <div id="cutButtons" class="buttons" style="display:none">
-        <button id="setCutStart" class="secondary" disabled>再生位置をカット開始に設定</button>
-        <button id="setCutEnd" class="secondary" disabled>再生位置をカット終了に設定</button>
-        <button id="previewCut" class="danger" disabled>削除部分を再生確認</button>
+        <button id="setCutStart" class="secondary" disabled>カット1開始に設定</button>
+        <button id="setCutEnd" class="secondary" disabled>カット1終了に設定</button>
+        <button id="previewCut" class="danger" disabled>カット1を再生確認</button>
+        <button id="setCut2Start" class="secondary" disabled>カット2開始に設定</button>
+        <button id="setCut2End" class="secondary" disabled>カット2終了に設定</button>
+        <button id="previewCut2" class="danger" style="background:#ea580c" disabled>カット2を再生確認</button>
       </div>
-      <div class="sub">赤い範囲が削除され、その前後が自動でつながります。</div>
+      <div class="sub">赤とオレンジ色の2区間が削除され、残った3つの部分が自動でつながります。</div>
     </div>
 
     <div class="buttons">
@@ -344,6 +349,8 @@
   const cutEnabled = $('cutEnabled'), cutControls = $('cutControls'), cutButtons = $('cutButtons');
   const cutStart = $('cutStart'), cutEnd = $('cutEnd');
   const setCutStart = $('setCutStart'), setCutEnd = $('setCutEnd'), previewCut = $('previewCut');
+  const cut2Start = $('cut2Start'), cut2End = $('cut2End');
+  const setCut2Start = $('setCut2Start'), setCut2End = $('setCut2End'), previewCut2 = $('previewCut2');
   const waveCanvas = $('waveCanvas');
   const waveCtx = waveCanvas.getContext('2d');
 
@@ -448,6 +455,16 @@
       ctx.moveTo(csx,0); ctx.lineTo(csx,h); ctx.moveTo(cex,0); ctx.lineTo(cex,h); ctx.stroke();
       ctx.fillStyle = '#dc2626'; ctx.beginPath();
       ctx.arc(csx,h-18,14,0,Math.PI*2); ctx.arc(cex,h-18,14,0,Math.PI*2); ctx.fill();
+
+      const cs2 = Math.max(s, Math.min(e, Number(cut2Start.value)||s));
+      const ce2 = Math.max(cs2, Math.min(e, Number(cut2End.value)||cs2));
+      const csx2 = (cs2/dur)*w, cex2 = (ce2/dur)*w;
+      ctx.fillStyle = 'rgba(234,88,12,.22)';
+      ctx.fillRect(csx2,0,Math.max(0,cex2-csx2),h);
+      ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 5; ctx.beginPath();
+      ctx.moveTo(csx2,0); ctx.lineTo(csx2,h); ctx.moveTo(cex2,0); ctx.lineTo(cex2,h); ctx.stroke();
+      ctx.fillStyle = '#ea580c'; ctx.beginPath();
+      ctx.arc(csx2,h-50,14,0,Math.PI*2); ctx.arc(cex2,h-50,14,0,Math.PI*2); ctx.fill();
     }
 
     const px = (audio.currentTime/dur)*w;
@@ -478,8 +495,12 @@
     const ex = (Number(endTime.value)/dur)*w;
     const csx = (Number(cutStart.value)/dur)*w;
     const cex = (Number(cutEnd.value)/dur)*w;
+    const csx2 = (Number(cut2Start.value)/dur)*w;
+    const cex2 = (Number(cut2End.value)/dur)*w;
     const hit = 42;
-    if (cutEnabled.checked && Math.abs(x-csx) <= hit) draggingHandle = 'cutStart';
+    if (cutEnabled.checked && Math.abs(x-csx2) <= hit) draggingHandle = 'cut2Start';
+    else if (cutEnabled.checked && Math.abs(x-cex2) <= hit) draggingHandle = 'cut2End';
+    else if (cutEnabled.checked && Math.abs(x-csx) <= hit) draggingHandle = 'cutStart';
     else if (cutEnabled.checked && Math.abs(x-cex) <= hit) draggingHandle = 'cutEnd';
     else if (Math.abs(x-sx) <= hit) draggingHandle = 'start';
     else if (Math.abs(x-ex) <= hit) draggingHandle = 'end';
@@ -506,7 +527,13 @@
       cutStart.value = Math.max(min,Math.min(t,max)).toFixed(1);
     } else if (draggingHandle === 'cutEnd') {
       const min = Math.min(Number(endTime.value),Number(cutStart.value)+0.1), max = Number(endTime.value);
-      cutEnd.value = Math.max(min,Math.min(t,max)).toFixed(1);
+      cutEnd.value = Math.max(min,Math.min(t,Math.min(max,Number(cut2Start.value)))).toFixed(1);
+    } else if (draggingHandle === 'cut2Start') {
+      const min = Math.max(Number(startTime.value),Number(cutEnd.value)), max = Math.max(min,Number(cut2End.value)-0.1);
+      cut2Start.value = Math.max(min,Math.min(t,max)).toFixed(1);
+    } else if (draggingHandle === 'cut2End') {
+      const min = Math.min(Number(endTime.value),Number(cut2Start.value)+0.1), max = Number(endTime.value);
+      cut2End.value = Math.max(min,Math.min(t,max)).toFixed(1);
     }
     updateTimeline();
   }
@@ -539,12 +566,12 @@
     $('fadeBar').style.width = fadeWidth + '%';
     $('timelineEnd').textContent = fmt(dur);
     let info = dur ? `使用範囲 ${fmt(s)} ～ ${fmt(e)} / フェード ${fadeActual.toFixed(1)}秒` : 'ファイルを選択してください';
-    if (dur && cutEnabled.checked) info += ` / 途中カット ${fmt(Number(cutStart.value))} ～ ${fmt(Number(cutEnd.value))}`;
+    if (dur && cutEnabled.checked) info += ` / カット1 ${fmt(Number(cutStart.value))}～${fmt(Number(cutEnd.value))} / カット2 ${fmt(Number(cut2Start.value))}～${fmt(Number(cut2End.value))}`;
     $('timelineInfo').textContent = info;
     drawWaveform();
   }
 
-  [startTime,endTime,fadeTime,cutStart,cutEnd].forEach(el => el.addEventListener('input', updateTimeline));
+  [startTime,endTime,fadeTime,cutStart,cutEnd,cut2Start,cut2End].forEach(el => el.addEventListener('input', updateTimeline));
   cutEnabled.addEventListener('change', () => {
     cutControls.style.display = cutEnabled.checked ? 'grid' : 'none';
     cutButtons.style.display = cutEnabled.checked ? 'flex' : 'none';
@@ -572,8 +599,10 @@
       startTime.value = '0';
       endTime.value = audioBuffer.duration.toFixed(1);
       fadeTime.value = Math.min(3, audioBuffer.duration).toFixed(1);
-      cutStart.value = (audioBuffer.duration*.4).toFixed(1);
-      cutEnd.value = (audioBuffer.duration*.6).toFixed(1);
+      cutStart.value = (audioBuffer.duration*.25).toFixed(1);
+      cutEnd.value = (audioBuffer.duration*.35).toFixed(1);
+      cut2Start.value = (audioBuffer.duration*.60).toFixed(1);
+      cut2End.value = (audioBuffer.duration*.70).toFixed(1);
 
       $('fileName').textContent = file.name;
       $('durationText').textContent = fmt(audioBuffer.duration) + ` (${audioBuffer.duration.toFixed(2)}秒)`;
@@ -583,7 +612,7 @@
       const base = file.name.replace(/\.(mp3|m4a)$/i,'');
       outputName.value = base + '_edited.mp3';
 
-      [processBtn,previewBtn,setStart,setEnd,setCutStart,setCutEnd,previewCut].forEach(b => b.disabled = false);
+      [processBtn,previewBtn,setStart,setEnd,setCutStart,setCutEnd,previewCut,setCut2Start,setCut2End,previewCut2].forEach(b => b.disabled = false);
       buildWaveform();
       updateTimeline();
       showStatus('読み込み完了です。開始・終了位置とフェード時間を設定してください。','ok');
@@ -607,17 +636,33 @@
 
   setCutStart.addEventListener('click', () => {
     if (!audioBuffer) return;
-    cutStart.value = Math.min(audio.currentTime,Number(cutEnd.value)).toFixed(1);
+    cutStart.value = Math.max(Number(startTime.value),Math.min(audio.currentTime,Number(cutEnd.value))).toFixed(1);
     updateTimeline();
   });
   setCutEnd.addEventListener('click', () => {
     if (!audioBuffer) return;
-    cutEnd.value = Math.max(audio.currentTime,Number(cutStart.value)).toFixed(1);
+    cutEnd.value = Math.min(Number(cut2Start.value),Math.max(audio.currentTime,Number(cutStart.value))).toFixed(1);
     updateTimeline();
   });
   previewCut.addEventListener('click', async () => {
     const cs = Number(cutStart.value), ce = Number(cutEnd.value);
     if (!(ce > cs)) return showStatus('カット終了はカット開始より後にしてください。','error');
+    clearInterval(previewTimer); audio.currentTime = cs; await audio.play();
+    previewTimer = setInterval(() => { if (audio.currentTime >= ce || audio.ended){ audio.pause(); clearInterval(previewTimer); } },50);
+  });
+  setCut2Start.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    cut2Start.value = Math.max(Number(cutEnd.value),Math.min(audio.currentTime,Number(cut2End.value))).toFixed(1);
+    updateTimeline();
+  });
+  setCut2End.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    cut2End.value = Math.min(Number(endTime.value),Math.max(audio.currentTime,Number(cut2Start.value))).toFixed(1);
+    updateTimeline();
+  });
+  previewCut2.addEventListener('click', async () => {
+    const cs = Number(cut2Start.value), ce = Number(cut2End.value);
+    if (!(ce > cs)) return showStatus('カット2の終了は開始より後にしてください。','error');
     clearInterval(previewTimer); audio.currentTime = cs; await audio.play();
     previewTimer = setInterval(() => { if (audio.currentTime >= ce || audio.ended){ audio.pause(); clearInterval(previewTimer); } },50);
   });
@@ -661,6 +706,7 @@
     let e = Number(endTime.value);
     let f = Number(fadeTime.value);
     let cs = Number(cutStart.value), ce = Number(cutEnd.value);
+    let cs2 = Number(cut2Start.value), ce2 = Number(cut2End.value);
 
     if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(f)){
       showStatus('数値を正しく入力してください。','error');
@@ -673,8 +719,8 @@
       return;
     }
     f = Math.max(0, Math.min(f, e-s));
-    if (cutEnabled.checked && (!Number.isFinite(cs) || !Number.isFinite(ce) || cs < s || ce > e || ce <= cs)){
-      showStatus('途中カット範囲は、使用範囲の内側で正しく指定してください。','error');
+    if (cutEnabled.checked && (![cs,ce,cs2,ce2].every(Number.isFinite) || cs < s || ce <= cs || cs2 < ce || ce2 <= cs2 || ce2 > e)){
+      showStatus('2つのカット範囲を、重ならないよう「カット1 → カット2」の順で指定してください。','error');
       return;
     }
 
@@ -690,7 +736,9 @@
       const endSample = Math.floor(e * sr);
       const cutStartSample = cutEnabled.checked ? Math.floor(cs*sr) : endSample;
       const cutEndSample = cutEnabled.checked ? Math.floor(ce*sr) : endSample;
-      const removedSamples = cutEnabled.checked ? cutEndSample-cutStartSample : 0;
+      const cut2StartSample = cutEnabled.checked ? Math.floor(cs2*sr) : endSample;
+      const cut2EndSample = cutEnabled.checked ? Math.floor(ce2*sr) : endSample;
+      const removedSamples = cutEnabled.checked ? (cutEndSample-cutStartSample)+(cut2EndSample-cut2StartSample) : 0;
       const length = endSample-startSample-removedSamples;
       f = Math.min(f,length/sr);
       const channels = Math.min(2, audioBuffer.numberOfChannels);
@@ -698,23 +746,25 @@
       let left = new Float32Array(length);
       let right = channels > 1 ? new Float32Array(length) : null;
 
-      const beforeLength = cutStartSample-startSample;
-      const sourceLeft = audioBuffer.getChannelData(0);
-      left.set(sourceLeft.subarray(startSample,cutStartSample),0);
-      if (cutEnabled.checked) left.set(sourceLeft.subarray(cutEndSample,endSample),beforeLength);
-      if (channels > 1){
-        const sourceRight = audioBuffer.getChannelData(1);
-        right.set(sourceRight.subarray(startSample,cutStartSample),0);
-        if (cutEnabled.checked) right.set(sourceRight.subarray(cutEndSample,endSample),beforeLength);
-      }
+      const ranges = cutEnabled.checked
+        ? [[startSample,cutStartSample],[cutEndSample,cut2StartSample],[cut2EndSample,endSample]]
+        : [[startSample,endSample]];
+      const copyRanges = (source,target) => {
+        let offset = 0;
+        for (const [from,to] of ranges){ target.set(source.subarray(from,to),offset); offset += to-from; }
+      };
+      copyRanges(audioBuffer.getChannelData(0),left);
+      if (channels > 1) copyRanges(audioBuffer.getChannelData(1),right);
 
       if (cutEnabled.checked){
-        const join = beforeLength;
-        const cross = Math.min(Math.floor(sr*.01),join,length-join);
-        for(let i=0;i<cross;i++){
-          const mix = i/cross, a = join-cross+i, b = join+i;
-          left[a] *= 1-mix; left[b] *= mix;
-          if (right){ right[a] *= 1-mix; right[b] *= mix; }
+        const joins = [cutStartSample-startSample, (cutStartSample-startSample)+(cut2StartSample-cutEndSample)];
+        for (const join of joins){
+          const cross = Math.min(Math.floor(sr*.01),join,length-join);
+          for(let i=0;i<cross;i++){
+            const mix = i/cross, a = join-cross+i, b = join+i;
+            left[a] *= 1-mix; left[b] *= mix;
+            if (right){ right[a] *= 1-mix; right[b] *= mix; }
+          }
         }
       }
 
@@ -796,8 +846,9 @@
       downloadLink.style.display = 'inline-flex';
 
       progress.value = 100;
-      const outDuration = (e-s)-(cutEnabled.checked ? ce-cs : 0);
-      showStatus(`完成しました。\n長さ: ${outDuration.toFixed(2)}秒 / 途中カット: ${cutEnabled.checked ? `${(ce-cs).toFixed(2)}秒` : 'なし'} / フェードアウト: ${f.toFixed(2)}秒 / ノーマライズ: ${normalize.checked ? 'ON' : 'OFF'} / 192kbps MP3`,'ok');
+      const removedDuration = cutEnabled.checked ? (ce-cs)+(ce2-cs2) : 0;
+      const outDuration = (e-s)-removedDuration;
+      showStatus(`完成しました。\n長さ: ${outDuration.toFixed(2)}秒 / 途中カット: ${cutEnabled.checked ? `2カ所・合計${removedDuration.toFixed(2)}秒` : 'なし'} / フェードアウト: ${f.toFixed(2)}秒 / ノーマライズ: ${normalize.checked ? 'ON' : 'OFF'} / 192kbps MP3`,'ok');
     }catch(err){
       console.error(err);
       showStatus('処理中にエラーが発生しました: ' + (err?.message || err),'error');
