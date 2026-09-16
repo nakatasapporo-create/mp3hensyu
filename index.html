@@ -187,34 +187,60 @@
         </div>
       </div>
 
-      <!-- Audio Player Controls & Preview -->
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        
-        <!-- HTML Native Audio Hidden Element -->
+      <!-- Clearly separated Before / After Players -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-4">
         <audio id="audioElement" class="hidden"></audio>
 
-        <!-- Transport Buttons -->
-        <div class="flex items-center gap-3">
-          <button id="playPauseBtn" disabled class="w-12 h-12 rounded-full bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:hover:bg-brand-600 text-white flex items-center justify-center text-lg shadow-lg shadow-brand-600/30 transition-all">
-            <i id="playIcon" class="fa-solid fa-play ml-0.5"></i>
-          </button>
-          <button id="stopBtn" disabled class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 flex items-center justify-center transition">
-            <i class="fa-solid fa-square text-sm"></i>
-          </button>
+        <div class="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-950 border border-slate-800 px-3 py-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="text-xs text-slate-500">現在の再生:</span>
+            <span id="playbackModeBadge" class="px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold">停止中</span>
+            <span id="playbackStatusText" class="text-xs text-slate-400">下のボタンを選んでください</span>
+          </div>
+          <span id="playbackTimeText" class="text-xs font-mono text-emerald-400">0:00.0 / 0:00.0</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div id="originalPlayerCard" class="rounded-xl border-2 border-blue-500/40 bg-blue-500/5 p-4 flex flex-col gap-3 transition-all">
+            <div>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2.5 py-1 text-xs font-bold">
+                <i class="fa-solid fa-file-audio"></i> 編集前（原音）
+              </span>
+              <p class="text-[11px] text-slate-400 mt-2">途中カットや音量調整を反映しない、元の音声を確認します。</p>
+            </div>
+            <div class="flex items-center gap-2 mt-auto">
+              <button id="playPauseBtn" disabled class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white flex items-center justify-center gap-2 text-sm font-bold shadow-lg shadow-blue-600/20 transition-all">
+                <i id="playIcon" class="fa-solid fa-play"></i>
+                <span id="originalPlayLabel">編集前を再生</span>
+              </button>
+              <button id="stopBtn" disabled class="w-11 h-11 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 flex items-center justify-center transition" title="編集前の再生を停止">
+                <i class="fa-solid fa-square text-sm"></i>
+              </button>
+            </div>
+          </div>
+
+          <div id="editedPlayerCard" class="rounded-xl border-2 border-emerald-500/40 bg-emerald-500/5 p-4 flex flex-col gap-3 transition-all">
+            <div>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 text-xs font-bold">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> 編集後（完成版）
+              </span>
+              <p class="text-[11px] text-slate-400 mt-2">トリミング・途中カット・音量・フェードをすべて反映します。</p>
+            </div>
+            <button id="previewEditedBtn" disabled class="w-full px-4 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 font-bold text-sm text-white shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all mt-auto">
+              <i class="fa-solid fa-play"></i>
+              <span>編集後を再生</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-800/80">
           <button id="setStartBtn" disabled class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-slate-200 transition">
             <i class="fa-solid fa-right-to-bracket text-brand-400 mr-1"></i>再生位置を開始に設定
           </button>
           <button id="setEndBtn" disabled class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-slate-200 transition">
             <i class="fa-solid fa-right-from-bracket text-rose-400 mr-1"></i>再生位置を終了に設定
           </button>
-        </div>
-
-        <!-- Preview Edited Audio Button -->
-        <div class="flex items-center gap-3 w-full md:w-auto">
-          <button id="previewEditedBtn" disabled class="w-full md:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 font-bold text-sm text-white shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all">
-            <i class="fa-solid fa-wand-magic-sparkles"></i>
-            <span>編集結果（完成版）を試聴</span>
-          </button>
+          <span class="text-[11px] text-slate-500 ml-auto"><i class="fa-solid fa-hand-pointer mr-1"></i>波形を指・マウスで左右になぞると再生位置を移動できます</span>
         </div>
       </div>
 
@@ -368,12 +394,19 @@
   const zoomOutBtn = $('zoomOutBtn');
   const zoomResetBtn = $('zoomResetBtn');
 
+  const audioElement = $('audioElement');
   const playPauseBtn = $('playPauseBtn');
   const playIcon = $('playIcon');
+  const originalPlayLabel = $('originalPlayLabel');
   const stopBtn = $('stopBtn');
   const setStartBtn = $('setStartBtn');
   const setEndBtn = $('setEndBtn');
   const previewEditedBtn = $('previewEditedBtn');
+  const originalPlayerCard = $('originalPlayerCard');
+  const editedPlayerCard = $('editedPlayerCard');
+  const playbackModeBadge = $('playbackModeBadge');
+  const playbackStatusText = $('playbackStatusText');
+  const playbackTimeText = $('playbackTimeText');
 
   const startTimeInput = $('startTimeInput');
   const endTimeInput = $('endTimeInput');
@@ -413,6 +446,11 @@
   let editedPreviewSource = null;
   let editedPreviewCtx = null;
   let isStartingEditedPreview = false;
+  let editedPreviewBuffer = null;
+  let editedTimeline = [];
+  let editedPreviewStartedAt = 0;
+  let editedPreviewOffset = 0;
+  let scrubResumeMode = null;
 
   // Cut sections array: [{ id, start, end }]
   let cutSections = [];
@@ -429,6 +467,60 @@
     const s = (seconds % 60).toFixed(1);
     const sStr = s < 10 ? '0' + s : s;
     return `${m}:${sStr}`;
+  }
+
+  function setPlaybackState(mode, message = '') {
+    originalPlayerCard.classList.remove('ring-2', 'ring-blue-400', 'border-blue-400');
+    editedPlayerCard.classList.remove('ring-2', 'ring-emerald-400', 'border-emerald-400');
+
+    if (mode === 'original') {
+      playbackModeBadge.className = 'px-2.5 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-xs font-bold';
+      playbackModeBadge.textContent = '編集前（原音）';
+      playbackStatusText.textContent = message || '元の音声を再生しています';
+      originalPlayerCard.classList.add('ring-2', 'ring-blue-400', 'border-blue-400');
+    } else if (mode === 'edited') {
+      playbackModeBadge.className = 'px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-xs font-bold';
+      playbackModeBadge.textContent = '編集後（完成版）';
+      playbackStatusText.textContent = message || 'カットなどを反映した音声を再生しています';
+      editedPlayerCard.classList.add('ring-2', 'ring-emerald-400', 'border-emerald-400');
+    } else if (mode === 'seeking') {
+      playbackModeBadge.className = 'px-2.5 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-bold';
+      playbackModeBadge.textContent = '位置を移動中';
+      playbackStatusText.textContent = message || '指を離すと選んだ位置から再生します';
+    } else {
+      playbackModeBadge.className = 'px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-bold';
+      playbackModeBadge.textContent = '停止中';
+      playbackStatusText.textContent = message || '青は編集前、緑は編集後の再生です';
+    }
+  }
+
+  function updatePlaybackTimeDisplay() {
+    const duration = audioBuffer ? audioBuffer.duration : 0;
+    playbackTimeText.textContent = `${formatTime(currentTime)} / ${formatTime(duration)}`;
+  }
+
+  function cancelPlaybackAnimation() {
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+      animationFrameId = null;
+    }
+  }
+
+  function setOriginalButtonPlaying(playing) {
+    playIcon.className = playing ? 'fa-solid fa-pause' : 'fa-solid fa-play';
+    originalPlayLabel.textContent = playing ? '編集前を一時停止' : '編集前を再生';
+  }
+
+  function setEditedButtonPlaying(playing) {
+    if (playing) {
+      previewEditedBtn.innerHTML = '<i class="fa-solid fa-square"></i><span>編集後を停止</span>';
+      previewEditedBtn.classList.replace('from-emerald-600', 'from-rose-600');
+      previewEditedBtn.classList.replace('to-teal-600', 'to-rose-700');
+    } else {
+      previewEditedBtn.innerHTML = '<i class="fa-solid fa-play"></i><span>編集後を再生</span>';
+      previewEditedBtn.classList.replace('from-rose-600', 'from-emerald-600');
+      previewEditedBtn.classList.replace('to-rose-700', 'to-teal-600');
+    }
   }
 
   // Format Bytes Helper
@@ -492,6 +584,7 @@
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText('音声ファイルを読み込むと波形が表示されます', width / 2, height / 2);
+      updatePlaybackTimeDisplay();
       return;
     }
 
@@ -616,9 +709,20 @@
       ctx.moveTo(playX, 0);
       ctx.lineTo(playX, height);
       ctx.stroke();
+
+      // A visible grab handle makes it clear that the playhead can be moved
+      // directly with a finger or mouse.
+      ctx.fillStyle = '#34d399';
+      ctx.beginPath();
+      ctx.arc(playX, height / 2, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ecfdf5';
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
 
     rangeText.textContent = `${formatTime(sTime)} - ${formatTime(eTime)} (選択時間: ${(eTime - sTime).toFixed(1)}秒)`;
+    updatePlaybackTimeDisplay();
   }
 
 
@@ -644,6 +748,66 @@
     if (!item) return;
     item.querySelector('.cut-start').value = cut.start.toFixed(1);
     item.querySelector('.cut-end').value = cut.end.toFixed(1);
+  }
+
+  function pauseEditedPreviewForScrub() {
+    if (!editedPreviewSource) return;
+    const sourceToStop = editedPreviewSource;
+    editedPreviewSource = null;
+    sourceToStop.onended = null;
+    try { sourceToStop.stop(); } catch (_) {}
+    cancelPlaybackAnimation();
+    setEditedButtonPlaying(false);
+  }
+
+  function beginWaveformScrub(time) {
+    scrubResumeMode = null;
+
+    if (isPlaying) {
+      scrubResumeMode = 'original';
+      audioElement.pause();
+      isPlaying = false;
+      cancelPlaybackAnimation();
+      setOriginalButtonPlaying(false);
+    } else if (editedPreviewSource) {
+      scrubResumeMode = 'edited';
+      pauseEditedPreviewForScrub();
+    }
+
+    currentTime = Math.max(0, Math.min(audioBuffer.duration, time));
+    if (audioElement.src) audioElement.currentTime = currentTime;
+    setPlaybackState('seeking');
+    drawWaveform();
+  }
+
+  function moveWaveformScrub(time) {
+    currentTime = Math.max(0, Math.min(audioBuffer.duration, time));
+    if (audioElement.src) audioElement.currentTime = currentTime;
+    drawWaveform();
+  }
+
+  async function finishWaveformScrub() {
+    const resumeMode = scrubResumeMode;
+    scrubResumeMode = null;
+
+    if (resumeMode === 'original') {
+      try {
+        audioElement.currentTime = currentTime;
+        await audioElement.play();
+        isPlaying = true;
+        setOriginalButtonPlaying(true);
+        setPlaybackState('original', '移動した位置から再生しています');
+        updatePlayhead();
+      } catch (_) {
+        setPlaybackState('idle', '再生ボタンを押して再開してください');
+      }
+    } else if (resumeMode === 'edited') {
+      if (!startEditedPreviewAtSourceTime(currentTime)) {
+        setPlaybackState('idle', '編集後の再生範囲外です');
+      }
+    } else {
+      setPlaybackState('idle', '選んだ位置から再生できます');
+    }
   }
 
   function handlePointerDown(e) {
@@ -713,15 +877,12 @@
     } else if (Math.abs(x - ePos) <= hitThreshold) {
       activeHandle = 'end';
     } else {
-      // Set current playback head (Scrubbing start)
+      // Move the playhead by dragging the waveform. If audio is currently
+      // playing, pause it during the drag and resume when the finger lifts.
       activeHandle = null;
       isScrubbing = true;
       const clickTime = (x / rect.width) * duration;
-      currentTime = clickTime;
-      if (audioElement.src && !isPlaying) {
-        audioElement.currentTime = clickTime;
-      }
-      drawWaveform();
+      beginWaveformScrub(clickTime);
     }
   }
 
@@ -752,15 +913,18 @@
     
     const t = getCanvasTimeFromEvent(e);
     const duration = audioBuffer.duration;
+    let editRangeChanged = false;
 
     if (activeHandle === 'start') {
       const curEnd = parseFloat(endTimeInput.value) || duration;
       const newStart = Math.max(0, Math.min(t, curEnd - 0.1));
       startTimeInput.value = newStart.toFixed(1);
+      editRangeChanged = true;
     } else if (activeHandle === 'end') {
       const curStart = parseFloat(startTimeInput.value) || 0;
       const newEnd = Math.min(duration, Math.max(t, curStart + 0.1));
       endTimeInput.value = newEnd.toFixed(1);
+      editRangeChanged = true;
     } else if (activeHandle && activeHandle.startsWith('cut-')) {
       const match = activeHandle.match(/^cut-(\d+)-(start|end)$/);
       if (match) {
@@ -774,23 +938,22 @@
             cut.end = Math.min(trimEnd, Math.max(t, cut.start + 0.1));
           }
           updateCutInputs(cut);
+          editRangeChanged = true;
         }
       }
     } else if (isScrubbing) {
-      // Scrubbing playhead
-      currentTime = Math.max(0, Math.min(duration, t));
-      if (audioElement.src && !isPlaying) {
-        audioElement.currentTime = currentTime;
-      }
+      moveWaveformScrub(t);
     }
-    stopEditedPreview();
+    if (editRangeChanged) stopEditedPreview();
     drawWaveform();
   }
 
   function handlePointerUp() {
+    const finishedScrubbing = isScrubbing;
     activeHandle = null;
     isScrubbing = false;
     initialPinchDistance = null;
+    if (finishedScrubbing) finishWaveformScrub();
   }
 
   waveCanvas.addEventListener('mousedown', handlePointerDown);
@@ -856,6 +1019,9 @@
       cutSections = [];
       nextCutId = 1;
       selectedCutId = null;
+      currentTime = 0;
+      editedPreviewBuffer = null;
+      editedTimeline = [];
       renderCutList();
 
       audioElement.src = URL.createObjectURL(file);
@@ -863,6 +1029,9 @@
       // Enable UI
       [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, exportBtn].forEach(b => b.disabled = false);
 
+      setOriginalButtonPlaying(false);
+      setEditedButtonPlaying(false);
+      setPlaybackState('idle', '青は編集前、緑は編集後の再生です');
       computePeaks();
       hideProgress();
     } catch (err) {
@@ -873,30 +1042,46 @@
   }
 
   // Playback Control (Native Audio Element for Normal Playback)
-  function togglePlay() {
+  async function togglePlay() {
     if (!audioBuffer) return;
     stopEditedPreview();
     if (isPlaying) {
       audioElement.pause();
       isPlaying = false;
-      playIcon.className = 'fa-solid fa-play ml-0.5';
+      cancelPlaybackAnimation();
+      setOriginalButtonPlaying(false);
+      setPlaybackState('idle', '編集前の音声を一時停止しました');
     } else {
+      const trimStart = parseFloat(startTimeInput.value) || 0;
+      const trimEnd = parseFloat(endTimeInput.value) || audioBuffer.duration;
+      if (currentTime < trimStart || currentTime >= trimEnd) currentTime = trimStart;
       audioElement.currentTime = currentTime;
-      audioElement.play();
-      isPlaying = true;
-      playIcon.className = 'fa-solid fa-pause';
-      updatePlayhead();
+      try {
+        await audioElement.play();
+        isPlaying = true;
+        setOriginalButtonPlaying(true);
+        setPlaybackState('original');
+        updatePlayhead();
+      } catch (_) {
+        setPlaybackState('idle', '再生を開始できませんでした');
+      }
     }
   }
 
-  function stopPlayback() {
+  function stopPlayback(resetPosition = true, updateStatus = true) {
+    cancelPlaybackAnimation();
     if (audioElement) {
       audioElement.pause();
-      audioElement.currentTime = parseFloat(startTimeInput.value) || 0;
+      if (resetPosition) {
+        audioElement.currentTime = parseFloat(startTimeInput.value) || 0;
+      }
     }
-    currentTime = parseFloat(startTimeInput.value) || 0;
+    if (resetPosition) {
+      currentTime = parseFloat(startTimeInput.value) || 0;
+    }
     isPlaying = false;
-    playIcon.className = 'fa-solid fa-play ml-0.5';
+    setOriginalButtonPlaying(false);
+    if (updateStatus) setPlaybackState('idle', '再生を停止しました');
     drawWaveform();
   }
 
@@ -922,6 +1107,7 @@
     const end = parseFloat(endTimeInput.value) || audioBuffer.duration;
     const newStart = Math.min(currentTime, end - 0.1);
     startTimeInput.value = newStart.toFixed(1);
+    stopEditedPreview();
     drawWaveform();
   });
 
@@ -930,6 +1116,7 @@
     const start = parseFloat(startTimeInput.value) || 0;
     const newEnd = Math.max(currentTime, start + 0.1);
     endTimeInput.value = newEnd.toFixed(1);
+    stopEditedPreview();
     drawWaveform();
   });
 
@@ -1169,6 +1356,113 @@
     return outputBuffer;
   }
 
+  // Map the edited audio timeline back to positions on the original waveform.
+  // This lets the green playhead jump over deleted sections while the edited
+  // result is playing.
+  function buildEditedTimeline() {
+    if (!audioBuffer) return [];
+    const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
+    const trimEnd = Math.min(audioBuffer.duration, parseFloat(endTimeInput.value) || audioBuffer.duration);
+    const sortedCuts = [...cutSections]
+      .filter(c => c.end > c.start && c.start < trimEnd && c.end > trimStart)
+      .sort((a, b) => a.start - b.start);
+
+    const sourceRanges = [];
+    let sourceCursor = trimStart;
+    sortedCuts.forEach(cut => {
+      const cutStart = Math.max(trimStart, cut.start);
+      const cutEnd = Math.min(trimEnd, cut.end);
+      if (cutStart > sourceCursor) sourceRanges.push([sourceCursor, cutStart]);
+      sourceCursor = Math.max(sourceCursor, cutEnd);
+    });
+    if (sourceCursor < trimEnd) sourceRanges.push([sourceCursor, trimEnd]);
+
+    let editedCursor = 0;
+    return sourceRanges.map(([sourceStart, sourceEnd]) => {
+      const segment = {
+        sourceStart,
+        sourceEnd,
+        editedStart: editedCursor,
+        editedEnd: editedCursor + (sourceEnd - sourceStart)
+      };
+      editedCursor = segment.editedEnd;
+      return segment;
+    });
+  }
+
+  function sourceTimeToEditedPosition(sourceTime) {
+    if (!editedTimeline.length) return null;
+    for (const segment of editedTimeline) {
+      if (sourceTime < segment.sourceStart) {
+        return { editedTime: segment.editedStart, sourceTime: segment.sourceStart };
+      }
+      if (sourceTime >= segment.sourceStart && sourceTime < segment.sourceEnd) {
+        return {
+          editedTime: segment.editedStart + (sourceTime - segment.sourceStart),
+          sourceTime
+        };
+      }
+    }
+    return null;
+  }
+
+  function editedPositionToSourceTime(editedTime) {
+    if (!editedTimeline.length) return 0;
+    for (const segment of editedTimeline) {
+      if (editedTime < segment.editedEnd) {
+        return segment.sourceStart + Math.max(0, editedTime - segment.editedStart);
+      }
+    }
+    return editedTimeline[editedTimeline.length - 1].sourceEnd;
+  }
+
+  function updateEditedPlayhead() {
+    if (!editedPreviewSource || !editedPreviewCtx || !editedPreviewBuffer) return;
+    const editedPosition = editedPreviewOffset + (editedPreviewCtx.currentTime - editedPreviewStartedAt);
+    currentTime = editedPositionToSourceTime(Math.min(editedPosition, editedPreviewBuffer.duration));
+    drawWaveform();
+    animationFrameId = requestAnimationFrame(updateEditedPlayhead);
+  }
+
+  function startEditedPreviewAtSourceTime(sourceTime) {
+    if (!editedPreviewBuffer || !editedTimeline.length || !editedPreviewCtx) return false;
+
+    let mapped = sourceTimeToEditedPosition(sourceTime);
+    if (!mapped || mapped.editedTime >= editedPreviewBuffer.duration - 0.01) {
+      const first = editedTimeline[0];
+      mapped = { editedTime: first.editedStart, sourceTime: first.sourceStart };
+    }
+
+    if (editedPreviewSource) {
+      const oldSource = editedPreviewSource;
+      editedPreviewSource = null;
+      oldSource.onended = null;
+      try { oldSource.stop(); } catch (_) {}
+    }
+    cancelPlaybackAnimation();
+
+    const previewSource = editedPreviewCtx.createBufferSource();
+    previewSource.buffer = editedPreviewBuffer;
+    previewSource.connect(editedPreviewCtx.destination);
+    editedPreviewSource = previewSource;
+    editedPreviewOffset = Math.max(0, Math.min(mapped.editedTime, editedPreviewBuffer.duration - 0.001));
+    editedPreviewStartedAt = editedPreviewCtx.currentTime;
+    currentTime = mapped.sourceTime;
+
+    previewSource.onended = () => {
+      if (editedPreviewSource === previewSource) {
+        currentTime = editedTimeline.length ? editedTimeline[editedTimeline.length - 1].sourceEnd : currentTime;
+        stopEditedPreview(false);
+        drawWaveform();
+      }
+    };
+    previewSource.start(0, editedPreviewOffset);
+    setEditedButtonPlaying(true);
+    setPlaybackState('edited');
+    updateEditedPlayhead();
+    return true;
+  }
+
   // Real-time Preview of Edited Result
   previewEditedBtn.addEventListener('click', async () => {
     if (isStartingEditedPreview) return;
@@ -1180,9 +1474,10 @@
 
     try {
       isStartingEditedPreview = true;
-      stopPlayback();
-      const processedBuffer = processAudioBuffer();
-      if (!processedBuffer) return;
+      stopPlayback(false, false);
+      editedPreviewBuffer = processAudioBuffer();
+      editedTimeline = buildEditedTimeline();
+      if (!editedPreviewBuffer || !editedTimeline.length) return;
 
       // Resume from the button click. This is required by iPad/Safari's
       // autoplay policy and is more stable than creating a new context for
@@ -1192,23 +1487,7 @@
       }
 
       editedPreviewCtx = audioContext;
-      const previewSource = editedPreviewCtx.createBufferSource();
-      previewSource.buffer = processedBuffer;
-      previewSource.connect(editedPreviewCtx.destination);
-      editedPreviewSource = previewSource;
-
-      // An old source may fire onended after a new preview has started. Only
-      // the source that is still current is allowed to reset the preview.
-      previewSource.onended = () => {
-        if (editedPreviewSource === previewSource) {
-          stopEditedPreview(false);
-        }
-      };
-      previewSource.start(0);
-
-      previewEditedBtn.innerHTML = '<i class="fa-solid fa-square"></i><span>プレビュー停止</span>';
-      previewEditedBtn.classList.replace('from-emerald-600', 'from-rose-600');
-      previewEditedBtn.classList.replace('to-teal-600', 'to-rose-700');
+      startEditedPreviewAtSourceTime(currentTime);
     } catch (err) {
       stopEditedPreview();
       alert(err.message || 'プレビュー再生に失敗しました');
@@ -1217,7 +1496,9 @@
     }
   });
 
-  function stopEditedPreview(shouldStopSource = true) {
+  function stopEditedPreview(shouldStopSource = true, clearCache = true, updateStatus = true) {
+    const hadEditedPreview = Boolean(editedPreviewSource || editedPreviewBuffer);
+    if (hadEditedPreview) cancelPlaybackAnimation();
     if (editedPreviewSource) {
       const sourceToStop = editedPreviewSource;
       editedPreviewSource = null;
@@ -1229,9 +1510,14 @@
     // Keep the shared context alive. Repeatedly closing and recreating it is
     // a common cause of silent or interrupted previews on iOS/iPadOS.
     editedPreviewCtx = null;
-    previewEditedBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span>編集結果（完成版）を試聴</span>';
-    previewEditedBtn.classList.replace('from-rose-600', 'from-emerald-600');
-    previewEditedBtn.classList.replace('to-rose-700', 'to-teal-600');
+    if (clearCache) {
+      editedPreviewBuffer = null;
+      editedTimeline = [];
+    }
+    setEditedButtonPlaying(false);
+    if (updateStatus && hadEditedPreview) {
+      setPlaybackState('idle', '編集後の音声を停止しました');
+    }
   }
 
 
