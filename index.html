@@ -1,963 +1,1294 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" class="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>音声トリミング・途中カット＆フェードアウト</title>
+  <title>プロフェッショナル音声エディター</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- lamejs for MP3 Encoding -->
+  <script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
   <style>
-    :root{
-      --bg:#f5f7fb;
-      --card:#ffffff;
-      --text:#1f2937;
-      --muted:#6b7280;
-      --line:#d1d5db;
-      --accent:#2563eb;
-      --accent2:#1d4ed8;
-      --ok:#059669;
-      --danger:#dc2626;
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0;
-      font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-      background:var(--bg);
-      color:var(--text);
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
     }
-    .wrap{
-      max-width:920px;
-      margin:0 auto;
-      padding:24px 16px 40px;
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
     }
-    h1{
-      font-size:clamp(1.6rem,4vw,2.3rem);
-      margin:0 0 8px;
+    ::-webkit-scrollbar-thumb:hover {
+      background: #64748b;
     }
-    .lead{
-      margin:0 0 20px;
-      color:var(--muted);
-      line-height:1.7;
+    canvas {
+      touch-action: none;
     }
-    .card{
-      background:var(--card);
-      border:1px solid #e5e7eb;
-      border-radius:18px;
-      padding:18px;
-      box-shadow:0 8px 28px rgba(0,0,0,.06);
-      margin-bottom:16px;
+    /* iPad / Touch Optimized Range Slider */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
     }
-    .filebox{
-      border:2px dashed #b8c2d0;
-      border-radius:14px;
-      padding:22px;
-      text-align:center;
-      background:#fafcff;
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      height: 20px;
+      width: 20px;
+      border-radius: 50%;
+      background: #3b82f6;
+      cursor: pointer;
+      margin-top: -8px; /* Align with track */
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    input[type=file]{max-width:100%}
-    .meta{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(170px,1fr));
-      gap:10px;
-      margin-top:14px;
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 4px;
+      cursor: pointer;
+      background: #334155;
+      border-radius: 2px;
     }
-    .pill{
-      background:#f3f4f6;
-      padding:10px 12px;
-      border-radius:10px;
-      font-size:.95rem;
+    input[type=range]:focus {
+      outline: none;
     }
-    audio{
-      width:100%;
-      margin-top:16px;
-    }
-    .controls{
-      display:grid;
-      grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
-      gap:14px;
-      margin-top:10px;
-    }
-    label{
-      display:block;
-      font-weight:700;
-      margin-bottom:6px;
-    }
-    input[type=number], input[type=text]{
-      width:100%;
-      padding:11px 12px;
-      border:1px solid var(--line);
-      border-radius:10px;
-      font-size:1rem;
-    }
-    input[type=range]{
-      width:100%;
-    }
-    .sub{
-      color:var(--muted);
-      font-size:.88rem;
-      margin-top:5px;
-    }
-    .timeline{
-      margin-top:14px;
-      padding:12px;
-      background:#f8fafc;
-      border-radius:12px;
-      border:1px solid #e5e7eb;
-    }
-    .timeline-row{
-      display:flex;
-      justify-content:space-between;
-      gap:8px;
-      font-size:.9rem;
-      color:var(--muted);
-      margin-bottom:6px;
-    }
-    .bar{
-      position:relative;
-      height:16px;
-      background:#dbeafe;
-      border-radius:999px;
-      overflow:hidden;
-    }
-    .kept{
-      position:absolute;
-      top:0;bottom:0;
-      background:#60a5fa;
-    }
-    .fade{
-      position:absolute;
-      top:0;bottom:0;
-      background:linear-gradient(90deg,rgba(37,99,235,.85),rgba(37,99,235,.1));
-    }
-    .buttons{
-      display:flex;
-      flex-wrap:wrap;
-      gap:10px;
-      margin-top:16px;
-    }
-    button, .download{
-      appearance:none;
-      border:0;
-      border-radius:11px;
-      padding:11px 16px;
-      font-weight:800;
-      cursor:pointer;
-      font-size:.98rem;
-      text-decoration:none;
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-    }
-    .primary{background:var(--accent);color:white}
-    .primary:hover{background:var(--accent2)}
-    .secondary{background:#e5e7eb;color:#111827}
-    .success{background:var(--ok);color:white}
-    .danger{background:var(--danger);color:white}
-    button:disabled{opacity:.5;cursor:not-allowed}
-    .status{
-      margin-top:14px;
-      padding:11px 12px;
-      border-radius:10px;
-      background:#eef2ff;
-      color:#3730a3;
-      display:none;
-      white-space:pre-wrap;
-    }
-    .status.error{background:#fef2f2;color:#991b1b}
-    .status.ok{background:#ecfdf5;color:#065f46}
-    progress{
-      width:100%;
-      height:16px;
-      margin-top:12px;
-      display:none;
-    }
-    .note{
-      font-size:.9rem;
-      color:var(--muted);
-      line-height:1.6;
-    }
-  
-    .wave-wrap{
-      margin-top:16px;
-      border:1px solid #dbe3ef;
-      border-radius:14px;
-      background:#f8fafc;
-      padding:12px;
-      touch-action:none;
-      user-select:none;
-    }
-    .wave-title{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:center;
-      margin-bottom:8px;
-      font-size:.92rem;
-      color:var(--muted);
-    }
-    #waveCanvas{
-      width:100%;
-      height:150px;
-      display:block;
-      border-radius:10px;
-      background:#ffffff;
-      touch-action:none;
-    }
-    .wave-help{
-      margin-top:8px;
-      color:var(--muted);
-      font-size:.86rem;
-      line-height:1.5;
-    }
-
   </style>
 </head>
-<body>
-<div class="wrap">
-  <h1>音声トリミング・途中カット＆フェードアウト</h1>
-  <p class="lead">MP3やiPadボイスメモのM4Aをブラウザ内で編集します。先頭・末尾のトリミングに加え、途中の不要部分も削除できます。</p>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-brand-500 selection:text-white">
 
-  <div class="card">
-    <div class="filebox">
-      <strong>MP3 / M4Aファイルを選択</strong><br><br>
-      <input id="fileInput" type="file" accept="audio/*,.mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a">
-    </div>
-    <div id="meta" class="meta" style="display:none">
-      <div class="pill">ファイル名: <span id="fileName">-</span></div>
-      <div class="pill">長さ: <span id="durationText">-</span></div>
-      <div class="pill">サイズ: <span id="fileSize">-</span></div>
-    </div>
-    <audio id="audio" controls></audio>
-
-    <div class="wave-wrap">
-      <div class="wave-title">
-        <strong>波形で範囲指定</strong>
-        <span id="waveRangeText">未選択</span>
+<div class="max-w-7xl mx-auto px-4 py-6 flex flex-col gap-6">
+  
+  <!-- Header -->
+  <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center shadow-lg shadow-brand-500/20">
+        <i class="fa-solid to-white fa-waveform text-xl"></i>
       </div>
-      <canvas id="waveCanvas" width="1200" height="300"></canvas>
-      <div class="wave-help">
-        青いハンドル＝残す範囲、赤＝カット1、オレンジ＝カット2です。iPadでは指でドラッグできます。
+      <div>
+        <h1 class="text-xl font-bold tracking-tight text-white flex items-center gap-2">
+          SoundEdit Studio Pro
+          <span class="text-xs px-2 py-0.5 rounded-full bg-brand-500/20 text-brand-400 font-semibold border border-brand-500/30">v2.0</span>
+        </h1>
+        <p class="text-xs text-slate-400">ブラウザ完結型 音声トリミング・ノーマライズ・フェード・カットエディター</p>
       </div>
     </div>
+    
+    <div class="flex items-center gap-3 text-xs text-slate-400">
+      <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+        <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-200 font-mono">Space</kbd> 再生 / 停止
+      </span>
+      <span class="bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
+        <i class="fa-solid fa-shield-halved text-emerald-400"></i> ローカル完全処理（安全）
+      </span>
+    </div>
+  </header>
 
-  </div>
+  <!-- Main Grid -->
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-  <div class="card">
-    <div class="controls">
-      <div>
-        <label for="startTime">開始位置（秒）</label>
-        <input id="startTime" type="number" min="0" step="0.1" value="0">
-        <div class="sub">ここより前をカットします。</div>
+    <!-- Left / Center Panel (Waveform & Player Controls) -->
+    <div class="lg:col-span-8 flex flex-col gap-6">
+      
+      <!-- File Upload / Dropzone -->
+      <div id="dropzone" class="relative group border-2 border-dashed border-slate-700 hover:border-brand-500 rounded-2xl p-6 bg-slate-900/50 hover:bg-slate-900 transition-all duration-200 text-center cursor-pointer">
+        <input id="fileInput" type="file" accept="audio/*,.mp3,.m4a,.wav,.aac,.flac,.ogg" class="hidden" />
+        <div class="flex flex-col items-center justify-center gap-2">
+          <div class="w-12 h-12 rounded-full bg-slate-800 group-hover:bg-brand-500/10 text-slate-400 group-hover:text-brand-400 flex items-center justify-center transition-colors">
+            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+          </div>
+          <p class="text-sm font-medium text-slate-200">
+            音声ファイルをドラッグ＆ドロップ、または <span class="text-brand-400 underline decoration-brand-400/30 underline-offset-4">参照</span>
+          </p>
+          <p class="text-xs text-slate-500">対応形式: MP3, M4A, WAV, AAC, FLAC, OGG (ファイル容量無制限・サーバー送信なし)</p>
+        </div>
       </div>
-      <div>
-        <label for="endTime">終了位置（秒）</label>
-        <input id="endTime" type="number" min="0" step="0.1" value="0">
-        <div class="sub">ここより後ろをカットします。</div>
+
+      <!-- File Meta Bar (Hidden until loaded) -->
+      <div id="metaBar" class="hidden grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-xs text-slate-500">ファイル名</div>
+          <div id="fileName" class="text-sm font-medium text-slate-200 truncate">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-xs text-slate-500">総再生時間</div>
+          <div id="fileDuration" class="text-sm font-semibold text-brand-400">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-xs text-slate-500">サンプルレート</div>
+          <div id="fileSampleRate" class="text-sm font-medium text-slate-200">-</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
+          <div class="text-xs text-slate-500">サイズ</div>
+          <div id="fileSize" class="text-sm font-medium text-slate-200">-</div>
+        </div>
       </div>
-      <div>
-        <label for="fadeTime">フェードアウト（秒）</label>
-        <input id="fadeTime" type="number" min="0" step="0.1" value="3">
-        <div class="sub">切り出した音声の末尾に適用します。</div>
+
+      <!-- Waveform Studio Display Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3 shadow-xl relative overflow-hidden">
+        
+        <!-- Waveform Header & Zoom Toolbar -->
+        <div class="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-800/80">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-md bg-slate-800 text-slate-300">
+              <i class="fa-solid fa-wave-square text-brand-400"></i> 波形表示
+            </span>
+            <span id="rangeText" class="text-xs font-mono text-slate-400">0:00 - 0:00</span>
+          </div>
+
+          <!-- Zoom Controls -->
+          <div class="flex items-center gap-2 text-xs">
+            <span class="text-slate-500"><i class="fa-solid fa-magnifying-glass"></i></span>
+            <button id="zoomOutBtn" class="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition" title="縮小">
+              <i class="fa-solid fa-minus"></i>
+            </button>
+            <input id="zoomSlider" type="range" min="1" max="10" step="0.1" value="1" class="w-24 h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-500" />
+            <button id="zoomInBtn" class="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center transition" title="拡大">
+              <i class="fa-solid fa-plus"></i>
+            </button>
+            <button id="zoomResetBtn" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition" title="全表示">
+              リセット
+            </button>
+          </div>
+        </div>
+
+        <!-- Canvas Container with Horizontal Scroll -->
+        <div id="waveScrollContainer" class="relative w-full overflow-x-auto overflow-y-hidden bg-slate-950 rounded-xl border border-slate-800/80 min-h-[180px]">
+          <canvas id="waveCanvas" class="block cursor-crosshair h-[180px]"></canvas>
+        </div>
+
+        <!-- Help Guide Badge -->
+        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-1">
+          <div class="flex items-center gap-4">
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> 青: 残す区間</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span> 赤: カット区間</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span> 緑線: 再生位置</span>
+          </div>
+          <div>※ 波形上をドラッグしてハンドル操作、クリックで再生位置指定が可能です</div>
+        </div>
       </div>
-      <div>
-        <label for="normalize">ノーマライズ</label>
-        <div style="padding:10px 0">
-          <label style="font-weight:600;display:flex;align-items:center;gap:8px">
-            <input id="normalize" type="checkbox" checked>
-            音量を自動調整する
+
+      <!-- Audio Player Controls & Preview -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        <!-- HTML Native Audio Hidden Element -->
+        <audio id="audioElement" class="hidden"></audio>
+
+        <!-- Transport Buttons -->
+        <div class="flex items-center gap-3">
+          <button id="playPauseBtn" disabled class="w-12 h-12 rounded-full bg-brand-600 hover:bg-brand-500 disabled:opacity-40 disabled:hover:bg-brand-600 text-white flex items-center justify-center text-lg shadow-lg shadow-brand-600/30 transition-all">
+            <i id="playIcon" class="fa-solid fa-play ml-0.5"></i>
+          </button>
+          <button id="stopBtn" disabled class="w-10 h-10 rounded-full bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-300 flex items-center justify-center transition">
+            <i class="fa-solid fa-square text-sm"></i>
+          </button>
+          <button id="setStartBtn" disabled class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-slate-200 transition">
+            <i class="fa-solid fa-right-to-bracket text-brand-400 mr-1"></i>再生位置を開始に設定
+          </button>
+          <button id="setEndBtn" disabled class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-slate-200 transition">
+            <i class="fa-solid fa-right-from-bracket text-rose-400 mr-1"></i>再生位置を終了に設定
+          </button>
+        </div>
+
+        <!-- Preview Edited Audio Button -->
+        <div class="flex items-center gap-3 w-full md:w-auto">
+          <button id="previewEditedBtn" disabled class="w-full md:w-auto px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:opacity-40 font-bold text-sm text-white shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 transition-all">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>編集結果（完成版）を試聴</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Panel (Trim, Cut List, Effects & Export Settings) -->
+    <div class="lg:col-span-4 flex flex-col gap-6">
+
+      <!-- Trim & Range Settings -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-lg">
+        <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+          <i class="fa-solid fa-scissors text-brand-400"></i> トリム＆エフェクト設定
+        </h2>
+
+        <!-- Start & End Time Controls -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">開始位置 (秒)</label>
+            <input id="startTimeInput" type="number" min="0" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">終了位置 (秒)</label>
+            <input id="endTimeInput" type="number" min="0" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+          </div>
+        </div>
+
+        <!-- Fade In & Fade Out -->
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">フェードイン (秒)</label>
+            <input id="fadeInInput" type="number" min="0" step="0.1" value="0" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">フェードアウト (秒)</label>
+            <input id="fadeOutInput" type="number" min="0" step="0.1" value="2.0" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+          </div>
+        </div>
+
+        <!-- Gain & Normalize -->
+        <div class="space-y-3 pt-1">
+          <div>
+            <div class="flex justify-between text-xs font-semibold text-slate-400 mb-1">
+              <span>音量調整 (ゲイン)</span>
+              <span id="gainValueText" class="font-mono text-brand-400">100%</span>
+            </div>
+            <input id="gainInput" type="range" min="0" max="200" value="100" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-brand-500" />
+          </div>
+
+          <label class="flex items-center gap-2 cursor-pointer bg-slate-950 border border-slate-800 rounded-xl p-3 hover:border-slate-700 transition">
+            <input id="normalizeInput" type="checkbox" checked class="w-4 h-4 rounded border-slate-700 text-brand-600 focus:ring-brand-500 bg-slate-900" />
+            <div class="text-xs">
+              <span class="font-bold text-slate-200 block">ピークノーマライズ</span>
+              <span class="text-slate-400">歪みを防ぎつつ最大音量を最適化 (-1dBFS)</span>
+            </div>
           </label>
         </div>
-        <div class="sub">最大ピークを約 -1 dBFS に合わせます。</div>
       </div>
+
+      <!-- Cut Sections Management (Unlimited Dynamic Cuts) -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-lg">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-trash-can text-rose-400"></i> 途中カット区間
+          </h2>
+          <button id="addCutBtn" disabled class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold transition flex items-center gap-1">
+            <i class="fa-solid fa-plus"></i> 区間追加
+          </button>
+        </div>
+
+        <!-- Cut List Container -->
+        <div id="cutList" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
+          <p id="noCutText" class="text-xs text-slate-500 text-center py-4">カット区間は追加されていません</p>
+        </div>
+      </div>
+
+      <!-- Output & Export Card -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-lg">
+        <h2 class="text-base font-bold text-white flex items-center gap-2 border-b border-slate-800 pb-3">
+          <i class="fa-solid fa-file-export text-emerald-400"></i> 書き出し保存
+        </h2>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 mb-1">出力ファイル名</label>
+          <input id="outputNameInput" type="text" value="edited_audio" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono text-slate-100 focus:outline-none focus:border-brand-500 transition" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">フォーマット</label>
+            <select id="formatSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500 transition">
+              <option value="wav">WAV (無劣化・爆速)</option>
+              <option value="mp3">MP3 (軽量)</option>
+            </select>
+          </div>
+          <div id="bitrateContainer">
+            <label class="block text-xs font-semibold text-slate-400 mb-1">ビットレート</label>
+            <select id="bitrateSelect" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-brand-500 transition">
+              <option value="128">128 kbps</option>
+              <option value="192" selected>192 kbps (標準)</option>
+              <option value="320">320 kbps (高音質)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Export Action Button -->
+        <button id="exportBtn" disabled class="w-full py-3.5 rounded-xl bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 disabled:opacity-40 font-extrabold text-white text-sm shadow-xl shadow-brand-600/25 flex items-center justify-center gap-2 transition-all">
+          <i class="fa-solid fa-download"></i>
+          <span>ファイルを処理して保存</span>
+        </button>
+
+        <!-- Download Link (Hidden by default) -->
+        <a id="downloadLink" class="hidden w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-center text-sm shadow-lg shadow-emerald-600/20 transition">
+          <i class="fa-solid fa-file-arrow-down mr-1.5"></i> ダウンロードを開始
+        </a>
+
+        <!-- Progress Bar & Status Text -->
+        <div id="progressBox" class="hidden flex-col gap-2">
+          <div class="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+            <div id="progressBar" class="bg-brand-500 h-2.5 rounded-full transition-all duration-150" style="width: 0%"></div>
+          </div>
+          <p id="statusText" class="text-xs text-slate-400 text-center font-mono truncate"></p>
+        </div>
+
+      </div>
+
     </div>
 
-    <div class="timeline" style="margin-top:18px">
-      <label style="display:flex;align-items:center;gap:9px">
-        <input id="cutEnabled" type="checkbox">
-        途中の不要部分を2カ所カットする
-      </label>
-      <div id="cutControls" class="controls" style="display:none">
-        <div><label for="cutStart">カット1 開始（秒）</label><input id="cutStart" type="number" min="0" step="0.1" value="0"><div class="sub">赤い範囲の開始です。</div></div>
-        <div><label for="cutEnd">カット1 終了（秒）</label><input id="cutEnd" type="number" min="0" step="0.1" value="0"><div class="sub">赤い範囲の終了です。</div></div>
-        <div><label for="cut2Start">カット2 開始（秒）</label><input id="cut2Start" type="number" min="0" step="0.1" value="0"><div class="sub">オレンジ色の範囲の開始です。</div></div>
-        <div><label for="cut2End">カット2 終了（秒）</label><input id="cut2End" type="number" min="0" step="0.1" value="0"><div class="sub">オレンジ色の範囲の終了です。</div></div>
-      </div>
-      <div id="cutButtons" class="buttons" style="display:none">
-        <button id="setCutStart" class="secondary" disabled>カット1開始に設定</button>
-        <button id="setCutEnd" class="secondary" disabled>カット1終了に設定</button>
-        <button id="previewCut" class="danger" disabled>カット1を再生確認</button>
-        <button id="setCut2Start" class="secondary" disabled>カット2開始に設定</button>
-        <button id="setCut2End" class="secondary" disabled>カット2終了に設定</button>
-        <button id="previewCut2" class="danger" style="background:#ea580c" disabled>カット2を再生確認</button>
-      </div>
-      <div class="sub">赤とオレンジ色の2区間が削除され、残った3つの部分が自動でつながります。</div>
-    </div>
-
-    <div class="buttons">
-      <button id="setStart" class="secondary" disabled>再生位置を開始に設定</button>
-      <button id="setEnd" class="secondary" disabled>再生位置を終了に設定</button>
-      <button id="preview" class="secondary" disabled>範囲をプレビュー</button>
-      <button id="previewEdited" class="primary" disabled>編集結果をプレビュー</button>
-    </div>
-    <div class="sub">「編集結果をプレビュー」は、トリミング部分と2カ所の削除部分を除き、書き出し後に残る音声を連続再生します。</div>
-
-    <div class="timeline">
-      <div class="timeline-row">
-        <span>0:00</span>
-        <span id="timelineInfo">ファイルを選択してください</span>
-        <span id="timelineEnd">0:00</span>
-      </div>
-      <div class="bar">
-        <div id="keptBar" class="kept" style="left:0%;width:0%"></div>
-        <div id="fadeBar" class="fade" style="left:0%;width:0%"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="card">
-    <label for="outputName">保存ファイル名</label>
-    <input id="outputName" type="text" value="trimmed_fadeout.mp3">
-
-    <div class="buttons">
-      <button id="processBtn" class="primary" disabled>MP3を書き出す</button>
-      <a id="downloadLink" class="download success" style="display:none">MP3をダウンロード</a>
-    </div>
-    <progress id="progress" max="100" value="0"></progress>
-    <div id="status" class="status"></div>
-
-    <p class="note">
-      ※ MP3/M4Aの読み込みはブラウザの音声デコード機能を使い、書き出しはMP3になります。MP3書き出しにはブラウザ上で動く lamejs を利用します。最初の読み込み時にCDNへ接続します。
-      学校などCDNがブロックされる環境では、lame.min.js を同じフォルダに置く構成へ変更できます。
-    </p>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js"></script>
 <script>
 (() => {
+  // DOM Elements
   const $ = id => document.getElementById(id);
+  const dropzone = $('dropzone');
   const fileInput = $('fileInput');
-  const audio = $('audio');
-  const startTime = $('startTime');
-  const endTime = $('endTime');
-  const fadeTime = $('fadeTime');
-  const processBtn = $('processBtn');
-  const previewBtn = $('preview');
-  const previewEdited = $('previewEdited');
-  const setStart = $('setStart');
-  const setEnd = $('setEnd');
-  const status = $('status');
-  const progress = $('progress');
-  const downloadLink = $('downloadLink');
-  const outputName = $('outputName');
-  const normalize = $('normalize');
-  const cutEnabled = $('cutEnabled'), cutControls = $('cutControls'), cutButtons = $('cutButtons');
-  const cutStart = $('cutStart'), cutEnd = $('cutEnd');
-  const setCutStart = $('setCutStart'), setCutEnd = $('setCutEnd'), previewCut = $('previewCut');
-  const cut2Start = $('cut2Start'), cut2End = $('cut2End');
-  const setCut2Start = $('setCut2Start'), setCut2End = $('setCut2End'), previewCut2 = $('previewCut2');
+  const metaBar = $('metaBar');
+  const fileNameEl = $('fileName');
+  const fileDurationEl = $('fileDuration');
+  const fileSampleRateEl = $('fileSampleRate');
+  const fileSizeEl = $('fileSize');
   const waveCanvas = $('waveCanvas');
   const waveCtx = waveCanvas.getContext('2d');
+  const waveScrollContainer = $('waveScrollContainer');
 
-  let currentFile = null;
+  const zoomSlider = $('zoomSlider');
+  const zoomInBtn = $('zoomInBtn');
+  const zoomOutBtn = $('zoomOutBtn');
+  const zoomResetBtn = $('zoomResetBtn');
+
+  const playPauseBtn = $('playPauseBtn');
+  const playIcon = $('playIcon');
+  const stopBtn = $('stopBtn');
+  const setStartBtn = $('setStartBtn');
+  const setEndBtn = $('setEndBtn');
+  const previewEditedBtn = $('previewEditedBtn');
+
+  const startTimeInput = $('startTimeInput');
+  const endTimeInput = $('endTimeInput');
+  const fadeInInput = $('fadeInInput');
+  const fadeOutInput = $('fadeOutInput');
+  const gainInput = $('gainInput');
+  const gainValueText = $('gainValueText');
+  const normalizeInput = $('normalizeInput');
+
+  const addCutBtn = $('addCutBtn');
+  const cutList = $('cutList');
+  const noCutText = $('noCutText');
+
+  const outputNameInput = $('outputNameInput');
+  const formatSelect = $('formatSelect');
+  const bitrateContainer = $('bitrateContainer');
+  const bitrateSelect = $('bitrateSelect');
+  const exportBtn = $('exportBtn');
+  const downloadLink = $('downloadLink');
+  const progressBox = $('progressBox');
+  const progressBar = $('progressBar');
+  const statusText = $('statusText');
+  const rangeText = $('rangeText');
+
+  // Audio Context & State
+  let audioContext = null;
   let audioBuffer = null;
-  let objectUrl = null;
-  let previewTimer = null;
-  let editedPreviewContext = null;
+  let peaks = [];
+  let zoomLevel = 1;
+
+  let currentTime = 0;
+  let isPlaying = false;
+  let playStartTime = 0;
+  let playStartOffset = 0;
+  let animationFrameId = null;
+
   let editedPreviewSource = null;
-  let draggingHandle = null;
-  let waveformPeaks = [];
+  let editedPreviewCtx = null;
 
-  function fmt(sec){
-    if (!Number.isFinite(sec)) return '0:00';
-    const m = Math.floor(sec/60);
-    const s = Math.floor(sec%60).toString().padStart(2,'0');
-    return `${m}:${s}`;
+  // Cut sections array: [{ id, start, end }]
+  let cutSections = [];
+  let nextCutId = 1;
+
+  // Dragging state for waveform handles
+  let activeHandle = null; // 'start', 'end', or cut handle e.g. 'cut-1-start'
+
+  // Format Time Helper
+  function formatTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '0:00.0';
+    const m = Math.floor(seconds / 60);
+    const s = (seconds % 60).toFixed(1);
+    const sStr = s < 10 ? '0' + s : s;
+    return `${m}:${sStr}`;
   }
 
-  function showStatus(text, type=''){
-    status.style.display = 'block';
-    status.className = 'status' + (type ? ' ' + type : '');
-    status.textContent = text;
+  // Format Bytes Helper
+  function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 
 
-  function buildWaveform(){
-    waveformPeaks = [];
+  // Compute Peaks for Waveform Rendering
+  function computePeaks() {
     if (!audioBuffer) return;
-    const data = audioBuffer.getChannelData(0);
-    const points = 1200;
-    const block = Math.max(1, Math.floor(data.length / points));
-    for(let i=0;i<points;i++){
-      let peak = 0;
-      const start = i * block;
-      const end = Math.min(data.length, start + block);
-      for(let j=start;j<end;j++){
-        const a = Math.abs(data[j]);
-        if (a > peak) peak = a;
+    peaks = [];
+    const rawData = audioBuffer.getChannelData(0); // Channel 1
+    const totalPoints = Math.floor(waveScrollContainer.clientWidth * zoomLevel * 2);
+    const sampleStep = Math.max(1, Math.floor(rawData.length / totalPoints));
+
+    for (let i = 0; i < totalPoints; i++) {
+      const start = i * sampleStep;
+      const end = Math.min(rawData.length, start + sampleStep);
+      let max = 0;
+      for (let j = start; j < end; j++) {
+        const val = Math.abs(rawData[j]);
+        if (val > max) max = val;
       }
-      waveformPeaks.push(peak);
+      peaks.push(max);
     }
+    resizeCanvas();
+  }
+
+  // Resize Canvas to Match Zoom Level & Container
+  function resizeCanvas() {
+    const containerWidth = waveScrollContainer.clientWidth;
+    const canvasWidth = containerWidth * zoomLevel;
+    const dpr = window.devicePixelRatio || 1;
+
+    waveCanvas.style.width = canvasWidth + 'px';
+    waveCanvas.style.height = '180px';
+    waveCanvas.width = canvasWidth * dpr;
+    waveCanvas.height = 180 * dpr;
+    waveCtx.scale(dpr, dpr);
+
     drawWaveform();
   }
 
-  function drawWaveform(){
-    const c = waveCanvas;
+  // Render Waveform Canvas
+  function drawWaveform() {
+    const width = waveCanvas.width / (window.devicePixelRatio || 1);
+    const height = 180;
     const ctx = waveCtx;
-    const w = c.width, h = c.height;
-    ctx.clearRect(0,0,w,h);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0,0,w,h);
 
-    if (!audioBuffer || !waveformPeaks.length){
-      ctx.fillStyle = '#94a3b8';
-      ctx.font = '28px sans-serif';
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#020617'; // Dark Slate background
+    ctx.fillRect(0, 0, width, height);
+
+    if (!audioBuffer || peaks.length === 0) {
+      ctx.fillStyle = '#475569';
+      ctx.font = '14px sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText('音声ファイルを選択してください', w/2, h/2);
+      ctx.fillText('音声ファイルを読み込むと波形が表示されます', width / 2, height / 2);
       return;
     }
 
-    const dur = audioBuffer.duration;
-    const s = Math.max(0, Number(startTime.value)||0);
-    const e = Math.min(dur, Number(endTime.value)||dur);
-    const sx = (s/dur)*w;
-    const ex = (e/dur)*w;
+    const duration = audioBuffer.duration;
+    const sTime = Math.max(0, parseFloat(startTimeInput.value) || 0);
+    const eTime = Math.min(duration, parseFloat(endTimeInput.value) || duration);
 
-    ctx.fillStyle = '#e2e8f0';
-    ctx.fillRect(0,0,sx,h);
-    ctx.fillRect(ex,0,w-ex,h);
+    const sPos = (sTime / duration) * width;
+    const ePos = (eTime / duration) * width;
 
-    ctx.strokeStyle = '#64748b';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const mid = h/2;
-    for(let i=0;i<waveformPeaks.length;i++){
-      const x = i/(waveformPeaks.length-1)*w;
-      const amp = waveformPeaks[i] * (h*0.42);
-      ctx.moveTo(x, mid-amp);
-      ctx.lineTo(x, mid+amp);
+    // Out of range gray overlays
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+    ctx.fillRect(0, 0, sPos, height);
+    ctx.fillRect(ePos, 0, width - ePos, height);
+
+    // Active Trim Region background highlight
+    ctx.fillStyle = 'rgba(37, 99, 235, 0.12)';
+    ctx.fillRect(sPos, 0, ePos - sPos, height);
+
+    // Render Cut Sections (Red overlays)
+    cutSections.forEach(cut => {
+      const csPos = (Math.max(sTime, cut.start) / duration) * width;
+      const cePos = (Math.min(eTime, cut.end) / duration) * width;
+      if (cePos > csPos) {
+        ctx.fillStyle = 'rgba(244, 63, 94, 0.25)';
+        ctx.fillRect(csPos, 0, cePos - csPos, height);
+        
+        ctx.strokeStyle = '#f43f5e';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(csPos, 0, cePos - csPos, height);
+      }
+    });
+
+    // Draw Peaks (Waveform lines)
+    const midY = height / 2;
+    const barWidth = width / peaks.length;
+
+    ctx.fillStyle = '#3b82f6';
+    for (let i = 0; i < peaks.length; i++) {
+      const x = i * barWidth;
+      const peak = peaks[i];
+      const barHeight = Math.max(2, peak * (height * 0.42));
+
+      // Dim color if out of bounds or cut
+      const timeAtX = (x / width) * duration;
+      const isCut = cutSections.some(c => timeAtX >= c.start && timeAtX <= c.end);
+      const isTrimmedOut = timeAtX < sTime || timeAtX > eTime;
+
+      if (isCut) {
+        ctx.fillStyle = '#fb7185';
+      } else if (isTrimmedOut) {
+        ctx.fillStyle = '#334155';
+      } else {
+        ctx.fillStyle = '#60a5fa';
+      }
+
+      ctx.fillRect(x, midY - barHeight, Math.max(1, barWidth - 0.5), barHeight * 2);
     }
-    ctx.stroke();
 
+    // Start / End Handle Lines
+    ctx.lineWidth = 3;
+    // Start Handle
     ctx.strokeStyle = '#2563eb';
-    ctx.lineWidth = 5;
     ctx.beginPath();
-    ctx.moveTo(sx,0); ctx.lineTo(sx,h);
-    ctx.moveTo(ex,0); ctx.lineTo(ex,h);
+    ctx.moveTo(sPos, 0); ctx.lineTo(sPos, height);
     ctx.stroke();
 
     ctx.fillStyle = '#2563eb';
     ctx.beginPath();
-    ctx.arc(sx,18,14,0,Math.PI*2);
-    ctx.arc(ex,18,14,0,Math.PI*2);
+    ctx.arc(sPos, 16, 12, 0, Math.PI * 2); /* Increased handle size for touch */
     ctx.fill();
 
-    if (cutEnabled.checked){
-      const cs = Math.max(s, Math.min(e, Number(cutStart.value)||s));
-      const ce = Math.max(cs, Math.min(e, Number(cutEnd.value)||cs));
-      const csx = (cs/dur)*w, cex = (ce/dur)*w;
-      ctx.fillStyle = 'rgba(220,38,38,.22)';
-      ctx.fillRect(csx,0,Math.max(0,cex-csx),h);
-      ctx.strokeStyle = '#dc2626'; ctx.lineWidth = 5; ctx.beginPath();
-      ctx.moveTo(csx,0); ctx.lineTo(csx,h); ctx.moveTo(cex,0); ctx.lineTo(cex,h); ctx.stroke();
-      ctx.fillStyle = '#dc2626'; ctx.beginPath();
-      ctx.arc(csx,h-18,14,0,Math.PI*2); ctx.arc(cex,h-18,14,0,Math.PI*2); ctx.fill();
+    // End Handle
+    ctx.strokeStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.moveTo(ePos, 0); ctx.lineTo(ePos, height);
+    ctx.stroke();
 
-      const cs2 = Math.max(s, Math.min(e, Number(cut2Start.value)||s));
-      const ce2 = Math.max(cs2, Math.min(e, Number(cut2End.value)||cs2));
-      const csx2 = (cs2/dur)*w, cex2 = (ce2/dur)*w;
-      ctx.fillStyle = 'rgba(234,88,12,.22)';
-      ctx.fillRect(csx2,0,Math.max(0,cex2-csx2),h);
-      ctx.strokeStyle = '#ea580c'; ctx.lineWidth = 5; ctx.beginPath();
-      ctx.moveTo(csx2,0); ctx.lineTo(csx2,h); ctx.moveTo(cex2,0); ctx.lineTo(cex2,h); ctx.stroke();
-      ctx.fillStyle = '#ea580c'; ctx.beginPath();
-      ctx.arc(csx2,h-50,14,0,Math.PI*2); ctx.arc(cex2,h-50,14,0,Math.PI*2); ctx.fill();
-    }
+    ctx.fillStyle = '#2563eb';
+    ctx.beginPath();
+    ctx.arc(ePos, 16, 12, 0, Math.PI * 2); /* Increased handle size for touch */
+    ctx.fill();
 
-    const px = (audio.currentTime/dur)*w;
-    if (Number.isFinite(px)){
-      ctx.strokeStyle = '#ef4444';
+    // Current Playhead Position (Green Line)
+    if (currentTime >= 0) {
+      const playX = (currentTime / duration) * width;
+      ctx.strokeStyle = '#34d399';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(px,0); ctx.lineTo(px,h);
+      ctx.moveTo(playX, 0);
+      ctx.lineTo(playX, height);
       ctx.stroke();
     }
 
-    $('waveRangeText').textContent = `${fmt(s)} ～ ${fmt(e)}`;
+    rangeText.textContent = `${formatTime(sTime)} - ${formatTime(eTime)} (選択時間: ${(eTime - sTime).toFixed(1)}秒)`;
   }
 
-  function canvasXFromEvent(ev){
+
+  function getCanvasTimeFromEvent(e) {
     const rect = waveCanvas.getBoundingClientRect();
-    const clientX = ev.touches?.[0]?.clientX ?? ev.changedTouches?.[0]?.clientX ?? ev.clientX;
-    return Math.max(0, Math.min(rect.width, clientX - rect.left)) / rect.width * waveCanvas.width;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    return (x / rect.width) * audioBuffer.duration;
   }
 
-  function handlePointerStart(ev){
+  // Touch and Drag State
+  let initialPinchDistance = null;
+  let initialZoomLevel = 1;
+  let isScrubbing = false;
+
+  function handlePointerDown(e) {
     if (!audioBuffer) return;
-    ev.preventDefault();
-    const x = canvasXFromEvent(ev);
-    const w = waveCanvas.width;
-    const dur = audioBuffer.duration;
-    const sx = (Number(startTime.value)/dur)*w;
-    const ex = (Number(endTime.value)/dur)*w;
-    const csx = (Number(cutStart.value)/dur)*w;
-    const cex = (Number(cutEnd.value)/dur)*w;
-    const csx2 = (Number(cut2Start.value)/dur)*w;
-    const cex2 = (Number(cut2End.value)/dur)*w;
-    const hit = 42;
-    if (cutEnabled.checked && Math.abs(x-csx2) <= hit) draggingHandle = 'cut2Start';
-    else if (cutEnabled.checked && Math.abs(x-cex2) <= hit) draggingHandle = 'cut2End';
-    else if (cutEnabled.checked && Math.abs(x-csx) <= hit) draggingHandle = 'cutStart';
-    else if (cutEnabled.checked && Math.abs(x-cex) <= hit) draggingHandle = 'cutEnd';
-    else if (Math.abs(x-sx) <= hit) draggingHandle = 'start';
-    else if (Math.abs(x-ex) <= hit) draggingHandle = 'end';
-    else {
-      const t = (x/w)*dur;
-      audio.currentTime = t;
+    const rect = waveCanvas.getBoundingClientRect();
+
+    // Pinch Zoom Detection
+    if (e.touches && e.touches.length === 2) {
+      initialPinchDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      initialZoomLevel = zoomLevel;
+      activeHandle = null;
+      isScrubbing = false;
+      return;
+    }
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+    const duration = audioBuffer.duration;
+
+    const sTime = parseFloat(startTimeInput.value) || 0;
+    const eTime = parseFloat(endTimeInput.value) || duration;
+
+    const sPos = (sTime / duration) * rect.width;
+    const ePos = (eTime / duration) * rect.width;
+
+    const hitThreshold = 30; // Increased hit area for touch (iPad)
+
+    if (Math.abs(x - sPos) <= hitThreshold) {
+      activeHandle = 'start';
+    } else if (Math.abs(x - ePos) <= hitThreshold) {
+      activeHandle = 'end';
+    } else {
+      // Set current playback head (Scrubbing start)
+      activeHandle = null;
+      isScrubbing = true;
+      const clickTime = (x / rect.width) * duration;
+      currentTime = clickTime;
+      if (audioElement.src && !isPlaying) {
+        audioElement.currentTime = clickTime;
+      }
       drawWaveform();
     }
   }
 
-  function handlePointerMove(ev){
-    if (!audioBuffer || !draggingHandle) return;
-    ev.preventDefault();
-    const x = canvasXFromEvent(ev);
-    const t = (x/waveCanvas.width)*audioBuffer.duration;
-    if (draggingHandle === 'start'){
-      const max = Math.max(0, Number(endTime.value)-0.1);
-      startTime.value = Math.min(t,max).toFixed(1);
-    } else if (draggingHandle === 'end') {
-      const min = Math.min(audioBuffer.duration, Number(startTime.value)+0.1);
-      endTime.value = Math.max(t,min).toFixed(1);
-    } else if (draggingHandle === 'cutStart') {
-      const min = Number(startTime.value), max = Math.max(min,Number(cutEnd.value)-0.1);
-      cutStart.value = Math.max(min,Math.min(t,max)).toFixed(1);
-    } else if (draggingHandle === 'cutEnd') {
-      const min = Math.min(Number(endTime.value),Number(cutStart.value)+0.1), max = Number(endTime.value);
-      cutEnd.value = Math.max(min,Math.min(t,Math.min(max,Number(cut2Start.value)))).toFixed(1);
-    } else if (draggingHandle === 'cut2Start') {
-      const min = Math.max(Number(startTime.value),Number(cutEnd.value)), max = Math.max(min,Number(cut2End.value)-0.1);
-      cut2Start.value = Math.max(min,Math.min(t,max)).toFixed(1);
-    } else if (draggingHandle === 'cut2End') {
-      const min = Math.min(Number(endTime.value),Number(cut2Start.value)+0.1), max = Number(endTime.value);
-      cut2End.value = Math.max(min,Math.min(t,max)).toFixed(1);
+  function handlePointerMove(e) {
+    if (!audioBuffer) return;
+
+    // Pinch Zoom Handling
+    if (e.touches && e.touches.length === 2 && initialPinchDistance) {
+      e.preventDefault();
+      const currentDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const scale = currentDistance / initialPinchDistance;
+      let newZoom = initialZoomLevel * scale;
+      newZoom = Math.max(1, Math.min(10, newZoom)); // Min 1x, Max 10x
+      
+      if (Math.abs(newZoom - zoomLevel) > 0.1) {
+        zoomLevel = newZoom;
+        zoomSlider.value = zoomLevel;
+        computePeaks();
+      }
+      return;
     }
-    updateTimeline();
-  }
 
-  function handlePointerEnd(){
-    draggingHandle = null;
-  }
+    if (!activeHandle && !isScrubbing) return;
+    e.preventDefault();
+    
+    const t = getCanvasTimeFromEvent(e);
+    const duration = audioBuffer.duration;
 
-  waveCanvas.addEventListener('mousedown', handlePointerStart);
-  waveCanvas.addEventListener('mousemove', handlePointerMove);
-  window.addEventListener('mouseup', handlePointerEnd);
-  waveCanvas.addEventListener('touchstart', handlePointerStart, {passive:false});
-  waveCanvas.addEventListener('touchmove', handlePointerMove, {passive:false});
-  window.addEventListener('touchend', handlePointerEnd);
-
-
-  function updateTimeline(){
-    const dur = audioBuffer?.duration || 0;
-    const s = Math.max(0, Number(startTime.value) || 0);
-    const e = Math.min(dur, Number(endTime.value) || 0);
-    const f = Math.max(0, Number(fadeTime.value) || 0);
-    const left = dur ? (s/dur)*100 : 0;
-    const width = dur ? Math.max(0, (e-s)/dur)*100 : 0;
-    const fadeActual = Math.min(f, Math.max(0,e-s));
-    const fadeLeft = dur ? ((e-fadeActual)/dur)*100 : 0;
-    const fadeWidth = dur ? (fadeActual/dur)*100 : 0;
-    $('keptBar').style.left = left + '%';
-    $('keptBar').style.width = width + '%';
-    $('fadeBar').style.left = fadeLeft + '%';
-    $('fadeBar').style.width = fadeWidth + '%';
-    $('timelineEnd').textContent = fmt(dur);
-    let info = dur ? `使用範囲 ${fmt(s)} ～ ${fmt(e)} / フェード ${fadeActual.toFixed(1)}秒` : 'ファイルを選択してください';
-    if (dur && cutEnabled.checked) info += ` / カット1 ${fmt(Number(cutStart.value))}～${fmt(Number(cutEnd.value))} / カット2 ${fmt(Number(cut2Start.value))}～${fmt(Number(cut2End.value))}`;
-    $('timelineInfo').textContent = info;
+    if (activeHandle === 'start') {
+      const curEnd = parseFloat(endTimeInput.value) || duration;
+      const newStart = Math.max(0, Math.min(t, curEnd - 0.1));
+      startTimeInput.value = newStart.toFixed(1);
+    } else if (activeHandle === 'end') {
+      const curStart = parseFloat(startTimeInput.value) || 0;
+      const newEnd = Math.min(duration, Math.max(t, curStart + 0.1));
+      endTimeInput.value = newEnd.toFixed(1);
+    } else if (isScrubbing) {
+      // Scrubbing playhead
+      currentTime = Math.max(0, Math.min(duration, t));
+      if (audioElement.src && !isPlaying) {
+        audioElement.currentTime = currentTime;
+      }
+    }
+    stopEditedPreview();
     drawWaveform();
   }
 
-  [startTime,endTime,fadeTime,cutStart,cutEnd,cut2Start,cut2End].forEach(el => el.addEventListener('input', () => { stopEditedPreview(); updateTimeline(); }));
-  normalize.addEventListener('change', stopEditedPreview);
-  cutEnabled.addEventListener('change', () => {
-    stopEditedPreview();
-    cutControls.style.display = cutEnabled.checked ? 'grid' : 'none';
-    cutButtons.style.display = cutEnabled.checked ? 'flex' : 'none';
-    updateTimeline();
-  });
-  audio.addEventListener('timeupdate', drawWaveform);
+  function handlePointerUp() {
+    activeHandle = null;
+    isScrubbing = false;
+    initialPinchDistance = null;
+  }
 
-  function stopEditedPreview(){
-    if (editedPreviewSource){
-      try{ editedPreviewSource.stop(); }catch(_){ }
+  waveCanvas.addEventListener('mousedown', handlePointerDown);
+  waveCanvas.addEventListener('mousemove', handlePointerMove);
+  window.addEventListener('mouseup', handlePointerUp);
+
+  waveCanvas.addEventListener('touchstart', handlePointerDown, { passive: false });
+  waveCanvas.addEventListener('touchmove', handlePointerMove, { passive: false });
+  window.addEventListener('touchend', handlePointerUp);
+
+  // Resize Event for iPad Orientation Change
+  window.addEventListener('resize', () => {
+    if (audioBuffer) {
+      // Debounce slightly for smooth orientation change
+      clearTimeout(window.resizeTimer);
+      window.resizeTimer = setTimeout(() => {
+        computePeaks();
+      }, 100);
+    }
+  });
+
+
+  // File Loading Handler
+  dropzone.addEventListener('click', () => fileInput.click());
+  dropzone.addEventListener('dragover', (e) => { e.preventDefault(); dropzone.classList.add('border-brand-500'); });
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('border-brand-500'));
+  dropzone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('border-brand-500');
+    if (e.dataTransfer.files.length) loadFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) loadFile(e.target.files[0]);
+  });
+
+  async function loadFile(file) {
+    stopPlayback();
+    stopEditedPreview();
+    showProgress(10, '音声ファイルを読み込み中...');
+
+    try {
+      if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      const arrayBuffer = await file.arrayBuffer();
+      showProgress(40, '波形データをデコード中...');
+      
+      audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+      // Populate File Meta
+      fileNameEl.textContent = file.name;
+      fileDurationEl.textContent = formatTime(audioBuffer.duration);
+      fileSampleRateEl.textContent = `${audioBuffer.sampleRate} Hz`;
+      fileSizeEl.textContent = formatBytes(file.size);
+      metaBar.classList.remove('hidden');
+      metaBar.classList.add('grid');
+
+      // Set default controls
+      startTimeInput.value = '0.0';
+      endTimeInput.value = audioBuffer.duration.toFixed(1);
+      outputNameInput.value = file.name.replace(/\.[^/.]+$/, "") + "_edited";
+
+      audioElement.src = URL.createObjectURL(file);
+
+      // Enable UI
+      [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, exportBtn].forEach(b => b.disabled = false);
+
+      computePeaks();
+      hideProgress();
+    } catch (err) {
+      console.error(err);
+      alert('ファイルのデコードに失敗しました。対応している音声フォーマットか確認してください。');
+      hideProgress();
+    }
+  }
+
+  // Playback Control (Native Audio Element for Normal Playback)
+  function togglePlay() {
+    if (!audioBuffer) return;
+    stopEditedPreview();
+    if (isPlaying) {
+      audioElement.pause();
+      isPlaying = false;
+      playIcon.className = 'fa-solid fa-play ml-0.5';
+    } else {
+      audioElement.currentTime = currentTime;
+      audioElement.play();
+      isPlaying = true;
+      playIcon.className = 'fa-solid fa-pause';
+      updatePlayhead();
+    }
+  }
+
+  function stopPlayback() {
+    if (audioElement) {
+      audioElement.pause();
+      audioElement.currentTime = parseFloat(startTimeInput.value) || 0;
+    }
+    currentTime = parseFloat(startTimeInput.value) || 0;
+    isPlaying = false;
+    playIcon.className = 'fa-solid fa-play ml-0.5';
+    drawWaveform();
+  }
+
+  function updatePlayhead() {
+    if (isPlaying && audioElement) {
+      currentTime = audioElement.currentTime;
+      const endLimit = parseFloat(endTimeInput.value) || audioBuffer.duration;
+      if (currentTime >= endLimit || audioElement.ended) {
+        stopPlayback();
+        return;
+      }
+      drawWaveform();
+      animationFrameId = requestAnimationFrame(updatePlayhead);
+    }
+  }
+
+  playPauseBtn.addEventListener('click', togglePlay);
+  stopBtn.addEventListener('click', stopPlayback);
+
+  // Set Start/End From Current Head
+  setStartBtn.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    const end = parseFloat(endTimeInput.value) || audioBuffer.duration;
+    const newStart = Math.min(currentTime, end - 0.1);
+    startTimeInput.value = newStart.toFixed(1);
+    drawWaveform();
+  });
+
+  setEndBtn.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    const start = parseFloat(startTimeInput.value) || 0;
+    const newEnd = Math.max(currentTime, start + 0.1);
+    endTimeInput.value = newEnd.toFixed(1);
+    drawWaveform();
+  });
+
+  // Dynamic Cut Sections Management
+  function renderCutList() {
+    cutList.innerHTML = '';
+    if (cutSections.length === 0) {
+      cutList.appendChild(noCutText);
+      drawWaveform();
+      return;
+    }
+
+    cutSections.forEach((cut, index) => {
+      const item = document.createElement('div');
+      item.className = 'flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs';
+      item.innerHTML = `
+        <span class="font-bold text-rose-400">#${index + 1}</span>
+        <div class="grid grid-cols-2 gap-2 flex-1">
+          <div>
+            <span class="text-[10px] text-slate-500 block">開始(秒)</span>
+            <input type="number" step="0.1" value="${cut.start.toFixed(1)}" class="cut-start w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200" />
+          </div>
+          <div>
+            <span class="text-[10px] text-slate-500 block">終了(秒)</span>
+            <input type="number" step="0.1" value="${cut.end.toFixed(1)}" class="cut-end w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200" />
+          </div>
+        </div>
+        <button class="remove-cut text-slate-500 hover:text-rose-400 px-2 py-1 transition" title="削除">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      `;
+
+      item.querySelector('.cut-start').addEventListener('change', (e) => {
+        cut.start = Math.max(0, parseFloat(e.target.value) || 0);
+        stopEditedPreview();
+        drawWaveform();
+      });
+
+      item.querySelector('.cut-end').addEventListener('change', (e) => {
+        cut.end = Math.max(cut.start + 0.1, parseFloat(e.target.value) || cut.start + 0.1);
+        stopEditedPreview();
+        drawWaveform();
+      });
+
+      item.querySelector('.remove-cut').addEventListener('click', () => {
+        cutSections = cutSections.filter(c => c.id !== cut.id);
+        stopEditedPreview();
+        renderCutList();
+      });
+
+      cutList.appendChild(item);
+    });
+
+    drawWaveform();
+  }
+
+  addCutBtn.addEventListener('click', () => {
+    if (!audioBuffer) return;
+    const duration = audioBuffer.duration;
+    const s = parseFloat(startTimeInput.value) || 0;
+    const e = parseFloat(endTimeInput.value) || duration;
+
+    const defaultCutStart = s + (e - s) * 0.4;
+    const defaultCutEnd = s + (e - s) * 0.6;
+
+    cutSections.push({
+      id: nextCutId++,
+      start: parseFloat(defaultCutStart.toFixed(1)),
+      end: parseFloat(defaultCutEnd.toFixed(1))
+    });
+
+    stopEditedPreview();
+    renderCutList();
+  });
+
+  // Inputs Change Listener
+  [startTimeInput, endTimeInput, fadeInInput, fadeOutInput].forEach(el => {
+    el.addEventListener('input', () => {
+      stopEditedPreview();
+      drawWaveform();
+    });
+  });
+
+  gainInput.addEventListener('input', (e) => {
+    gainValueText.textContent = `${e.target.value}%`;
+    stopEditedPreview();
+  });
+
+  // Zoom Handling
+  zoomSlider.addEventListener('input', (e) => {
+    zoomLevel = parseFloat(e.target.value);
+    computePeaks();
+  });
+  zoomInBtn.addEventListener('click', () => {
+    zoomLevel = Math.min(10, zoomLevel + 0.5);
+    zoomSlider.value = zoomLevel;
+    computePeaks();
+  });
+  zoomOutBtn.addEventListener('click', () => {
+    zoomLevel = Math.max(1, zoomLevel - 0.5);
+    zoomSlider.value = zoomLevel;
+    computePeaks();
+  });
+  zoomResetBtn.addEventListener('click', () => {
+    zoomLevel = 1;
+    zoomSlider.value = 1;
+    computePeaks();
+  });
+
+  // Edited Audio Buffer Processor (Combines Trim, Cuts, Gain, Fades, Normalize)
+  function processAudioBuffer() {
+    if (!audioBuffer) return null;
+
+    const sampleRate = audioBuffer.sampleRate;
+    const duration = audioBuffer.duration;
+
+    const startTime = Math.max(0, parseFloat(startTimeInput.value) || 0);
+    const endTime = Math.min(duration, parseFloat(endTimeInput.value) || duration);
+
+    if (endTime <= startTime) throw new Error('終了位置は開始位置より後に設定してください。');
+
+    // Sort cuts chronologically
+    const sortedCuts = [...cutSections]
+      .filter(c => c.end > c.start && c.start < endTime && c.end > startTime)
+      .sort((a, b) => a.start - b.start);
+
+    // Calculate valid ranges to KEEP
+    const keepRanges = [];
+    let currentPos = startTime;
+
+    sortedCuts.forEach(cut => {
+      const cutS = Math.max(startTime, cut.start);
+      const cutE = Math.min(endTime, cut.end);
+      if (cutS > currentPos) {
+        keepRanges.push([Math.floor(currentPos * sampleRate), Math.floor(cutS * sampleRate)]);
+      }
+      currentPos = Math.max(currentPos, cutE);
+    });
+
+    if (currentPos < endTime) {
+      keepRanges.push([Math.floor(currentPos * sampleRate), Math.floor(endTime * sampleRate)]);
+    }
+
+    const totalSamples = keepRanges.reduce((acc, [from, to]) => acc + (to - from), 0);
+    if (totalSamples <= 0) throw new Error('全区間がカットされています。残す範囲を設定してください。');
+
+    const numChannels = audioBuffer.numberOfChannels;
+    const offlineCtx = new OfflineAudioContext(numChannels, totalSamples, sampleRate);
+    const outputBuffer = offlineCtx.createBuffer(numChannels, totalSamples, sampleRate);
+
+    const gainFactor = (parseFloat(gainInput.value) || 100) / 100;
+    const fadeInSec = Math.max(0, parseFloat(fadeInInput.value) || 0);
+    const fadeOutSec = Math.max(0, parseFloat(fadeOutInput.value) || 0);
+
+    const fadeInSamples = Math.floor(fadeInSec * sampleRate);
+    const fadeOutSamples = Math.floor(fadeOutSec * sampleRate);
+
+    for (let ch = 0; ch < numChannels; ch++) {
+      const srcData = audioBuffer.getChannelData(ch);
+      const destData = outputBuffer.getChannelData(ch);
+
+      let destOffset = 0;
+      keepRanges.forEach(([from, to]) => {
+        destData.set(srcData.subarray(from, to), destOffset);
+        destOffset += (to - from);
+      });
+
+      // Apply Gain Adjustment
+      if (gainFactor !== 1.0) {
+        for (let i = 0; i < totalSamples; i++) {
+          destData[i] *= gainFactor;
+        }
+      }
+
+      // Apply Fade In
+      if (fadeInSamples > 0) {
+        const count = Math.min(fadeInSamples, totalSamples);
+        for (let i = 0; i < count; i++) {
+          destData[i] *= (i / count);
+        }
+      }
+
+      // Apply Fade Out
+      if (fadeOutSamples > 0) {
+        const count = Math.min(fadeOutSamples, totalSamples);
+        const startIdx = totalSamples - count;
+        for (let i = 0; i < count; i++) {
+          destData[startIdx + i] *= (1 - (i / count));
+        }
+      }
+
+      // Apply Peak Normalization (-1dBFS ~ 0.89)
+      if (normalizeInput.checked) {
+        let maxPeak = 0;
+        for (let i = 0; i < totalSamples; i++) {
+          const abs = Math.abs(destData[i]);
+          if (abs > maxPeak) maxPeak = abs;
+        }
+        if (maxPeak > 0) {
+          const targetGain = 0.89 / maxPeak; // Peak at -1dB
+          for (let i = 0; i < totalSamples; i++) {
+            destData[i] *= targetGain;
+          }
+        }
+      }
+    }
+
+    return outputBuffer;
+  }
+
+  // Real-time Preview of Edited Result
+  previewEditedBtn.addEventListener('click', () => {
+    if (editedPreviewSource) {
+      stopEditedPreview();
+      return;
+    }
+
+    try {
+      stopPlayback();
+      const processedBuffer = processAudioBuffer();
+      if (!processedBuffer) return;
+
+      editedPreviewCtx = new (window.AudioContext || window.webkitAudioContext)();
+      editedPreviewSource = editedPreviewCtx.createBufferSource();
+      editedPreviewSource.buffer = processedBuffer;
+      editedPreviewSource.connect(editedPreviewCtx.destination);
+
+      editedPreviewSource.onended = () => stopEditedPreview();
+      editedPreviewSource.start();
+
+      previewEditedBtn.innerHTML = '<i class="fa-solid fa-square"></i><span>プレビュー停止</span>';
+      previewEditedBtn.classList.replace('from-emerald-600', 'from-rose-600');
+      previewEditedBtn.classList.replace('to-teal-600', 'to-rose-700');
+    } catch (err) {
+      alert(err.message || 'プレビュー再生に失敗しました');
+    }
+  });
+
+  function stopEditedPreview() {
+    if (editedPreviewSource) {
+      try { editedPreviewSource.stop(); } catch (_) {}
       editedPreviewSource = null;
     }
-    if (editedPreviewContext){
-      editedPreviewContext.close().catch(()=>{});
-      editedPreviewContext = null;
+    if (editedPreviewCtx) {
+      editedPreviewCtx.close().catch(() => {});
+      editedPreviewCtx = null;
     }
-    previewEdited.textContent = '編集結果をプレビュー';
+    previewEditedBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span>編集結果（完成版）を試聴</span>';
+    previewEditedBtn.classList.replace('from-rose-600', 'from-emerald-600');
+    previewEditedBtn.classList.replace('to-rose-700', 'to-teal-600');
   }
 
-  function getEditPlan(){
-    if (!audioBuffer) throw new Error('音声ファイルを選択してください。');
-    const s = Math.max(0,Number(startTime.value));
-    const e = Math.min(audioBuffer.duration,Number(endTime.value));
-    if (!Number.isFinite(s) || !Number.isFinite(e) || e <= s) throw new Error('使用範囲を正しく指定してください。');
-    let cuts = [];
-    if (cutEnabled.checked){
-      const values = [Number(cutStart.value),Number(cutEnd.value),Number(cut2Start.value),Number(cut2End.value)];
-      const [cs,ce,cs2,ce2] = values;
-      if (!values.every(Number.isFinite) || cs < s || ce <= cs || cs2 < ce || ce2 <= cs2 || ce2 > e){
-        throw new Error('2つのカット範囲を、重ならないよう「カット1 → カット2」の順で指定してください。');
-      }
-      cuts = [[cs,ce],[cs2,ce2]];
+
+  formatSelect.addEventListener('change', () => {
+    if (formatSelect.value === 'mp3') {
+      bitrateContainer.classList.remove('hidden');
+    } else {
+      bitrateContainer.classList.add('hidden');
     }
-    const seconds = cutEnabled.checked ? [[s,cuts[0][0]],[cuts[0][1],cuts[1][0]],[cuts[1][1],e]] : [[s,e]];
-    const sr = audioBuffer.sampleRate;
-    const ranges = seconds.map(([a,b])=>[Math.floor(a*sr),Math.floor(b*sr)]);
-    const length = ranges.reduce((total,[a,b])=>total+b-a,0);
-    return {s,e,cuts,sr,ranges,length};
+  });
+
+  // Fast WAV Encoder (16-bit PCM)
+  function bufferToWavBlob(buffer) {
+    const numChannels = buffer.numberOfChannels;
+    const sampleRate = buffer.sampleRate;
+    const format = 1; // PCM
+    const bitDepth = 16;
+    
+    let result;
+    if (numChannels === 2) {
+      const l = buffer.getChannelData(0);
+      const r = buffer.getChannelData(1);
+      result = interleave(l, r);
+    } else {
+      result = buffer.getChannelData(0);
+    }
+
+    const dataLength = result.length * 2;
+    const bufferArray = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(bufferArray);
+
+    /* RIFF identifier */
+    writeString(view, 0, 'RIFF');
+    /* RIFF chunk length */
+    view.setUint32(4, 36 + dataLength, true);
+    /* RIFF type */
+    writeString(view, 8, 'WAVE');
+    /* format chunk identifier */
+    writeString(view, 12, 'fmt ');
+    /* format chunk length */
+    view.setUint32(16, 16, true);
+    /* sample format (raw) */
+    view.setUint16(20, format, true);
+    /* channel count */
+    view.setUint16(22, numChannels, true);
+    /* sample rate */
+    view.setUint32(24, sampleRate, true);
+    /* byte rate (sample rate * block align) */
+    view.setUint32(28, sampleRate * numChannels * 2, true);
+    /* block align (channel count * bytes per sample) */
+    view.setUint16(32, numChannels * 2, true);
+    /* bits per sample */
+    view.setUint16(34, bitDepth, true);
+    /* data chunk identifier */
+    writeString(view, 36, 'data');
+    /* data chunk length */
+    view.setUint32(40, dataLength, true);
+
+    // Write PCM Samples
+    let offset = 44;
+    for (let i = 0; i < result.length; i++) {
+      const s = Math.max(-1, Math.min(1, result[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+      offset += 2;
+    }
+
+    return new Blob([bufferArray], { type: 'audio/wav' });
   }
 
-  function fillEditedChannels(plan, channelArrays){
-    for(let ch=0;ch<channelArrays.length;ch++){
-      const source = audioBuffer.getChannelData(ch);
-      let offset = 0;
-      for(const [from,to] of plan.ranges){ channelArrays[ch].set(source.subarray(from,to),offset); offset += to-from; }
+  function interleave(left, right) {
+    const length = left.length + right.length;
+    const result = new Float32Array(length);
+    let inputIndex = 0;
+    for (let index = 0; index < length;) {
+      result[index++] = left[inputIndex];
+      result[index++] = right[inputIndex];
+      inputIndex++;
     }
-    if (plan.ranges.length > 1){
-      let join = 0;
-      for(let r=0;r<plan.ranges.length-1;r++){
-        join += plan.ranges[r][1]-plan.ranges[r][0];
-        const cross = Math.min(Math.floor(plan.sr*.01),join,plan.length-join);
-        for(let i=0;i<cross;i++){
-          const mix=i/cross, a=join-cross+i, b=join+i;
-          for(const data of channelArrays){ data[a]*=1-mix; data[b]*=mix; }
+    return result;
+  }
+
+  function writeString(view, offset, string) {
+    for (let i = 0; i < string.length; i++) {
+      view.setUint8(offset + i, string.charCodeAt(i));
+    }
+  }
+
+  // Export File Process
+  exportBtn.addEventListener('click', async () => {
+    try {
+      stopPlayback();
+      stopEditedPreview();
+
+      const processedBuffer = processAudioBuffer();
+      if (!processedBuffer) return;
+
+      const format = formatSelect.value;
+      const baseName = outputNameInput.value.trim() || 'edited_audio';
+      exportBtn.disabled = true;
+      downloadLink.classList.add('hidden');
+      showProgress(10, '音声データを処理中...');
+
+      if (format === 'wav') {
+        showProgress(50, 'WAVファイルを生成中...');
+        const wavBlob = bufferToWavBlob(processedBuffer);
+        finishExport(wavBlob, `${baseName}.wav`);
+      } else if (format === 'mp3') {
+        if (typeof lamejs === 'undefined') {
+          throw new Error('MP3エンコーダーライブラリ (lamejs) が読み込めていません。');
         }
+        showProgress(20, 'MP3エンコード準備中...');
+        const kbps = parseInt(bitrateSelect.value, 10) || 192;
+        const mp3Blob = await encodeMp3(processedBuffer, kbps);
+        finishExport(mp3Blob, `${baseName}.mp3`);
       }
-    }
-    let f = Math.max(0,Math.min(Number(fadeTime.value)||0,plan.length/plan.sr));
-    const fadeSamples = Math.floor(f*plan.sr);
-    for(let i=0;i<fadeSamples;i++){
-      const gain=1-i/fadeSamples, idx=plan.length-fadeSamples+i;
-      for(const data of channelArrays) data[idx]*=gain;
-    }
-    if (normalize.checked){
-      let peak=0;
-      for(const data of channelArrays) for(let i=0;i<data.length;i++) peak=Math.max(peak,Math.abs(data[i]));
-      if (peak>0){
-        const gain=Math.min(Math.pow(10,-1/20)/peak,8);
-        for(const data of channelArrays) for(let i=0;i<data.length;i++) data[i]*=gain;
-      }
-    }
-    return f;
-  }
-
-  previewEdited.addEventListener('click', async () => {
-    if (editedPreviewSource){ stopEditedPreview(); return; }
-    try{
-      clearInterval(previewTimer); audio.pause();
-      const plan=getEditPlan();
-      const channels=Math.min(2,audioBuffer.numberOfChannels);
-      editedPreviewContext=new (window.AudioContext||window.webkitAudioContext)();
-      const buffer=editedPreviewContext.createBuffer(channels,plan.length,plan.sr);
-      const arrays=Array.from({length:channels},(_,ch)=>buffer.getChannelData(ch));
-      fillEditedChannels(plan,arrays);
-      editedPreviewSource=editedPreviewContext.createBufferSource();
-      editedPreviewSource.buffer=buffer;
-      editedPreviewSource.connect(editedPreviewContext.destination);
-      editedPreviewSource.onended=()=>{ if(editedPreviewSource) stopEditedPreview(); };
-      previewEdited.textContent='プレビューを停止';
-      showStatus(`編集結果を再生しています（約 ${(plan.length/plan.sr).toFixed(2)}秒）`,'ok');
-      editedPreviewSource.start();
-    }catch(err){ stopEditedPreview(); showStatus(err.message||String(err),'error'); }
-  });
-
-  fileInput.addEventListener('change', async () => {
-    stopEditedPreview();
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    currentFile = file;
-    downloadLink.style.display = 'none';
-    showStatus('MP3を読み込んでいます…');
-
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-    objectUrl = URL.createObjectURL(file);
-    audio.src = objectUrl;
-
-    try{
-      const arrayBuffer = await file.arrayBuffer();
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-      await ctx.close();
-
-      startTime.value = '0';
-      endTime.value = audioBuffer.duration.toFixed(1);
-      fadeTime.value = Math.min(3, audioBuffer.duration).toFixed(1);
-      cutStart.value = (audioBuffer.duration*.25).toFixed(1);
-      cutEnd.value = (audioBuffer.duration*.35).toFixed(1);
-      cut2Start.value = (audioBuffer.duration*.60).toFixed(1);
-      cut2End.value = (audioBuffer.duration*.70).toFixed(1);
-
-      $('fileName').textContent = file.name;
-      $('durationText').textContent = fmt(audioBuffer.duration) + ` (${audioBuffer.duration.toFixed(2)}秒)`;
-      $('fileSize').textContent = (file.size/1024/1024).toFixed(2) + ' MB';
-      $('meta').style.display = 'grid';
-
-      const base = file.name.replace(/\.(mp3|m4a)$/i,'');
-      outputName.value = base + '_edited.mp3';
-
-      [processBtn,previewBtn,previewEdited,setStart,setEnd,setCutStart,setCutEnd,previewCut,setCut2Start,setCut2End,previewCut2].forEach(b => b.disabled = false);
-      buildWaveform();
-      updateTimeline();
-      showStatus('読み込み完了です。開始・終了位置とフェード時間を設定してください。','ok');
-    }catch(err){
-      console.error(err);
-      showStatus('音声の読み込みに失敗しました。このM4A/MP3をブラウザがデコードできない可能性があります。iPadのボイスメモM4Aは通常Safariで読み込めます。','error');
+    } catch (err) {
+      alert('エラー: ' + err.message);
+      hideProgress();
+    } finally {
+      exportBtn.disabled = false;
     }
   });
 
-  setStart.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    startTime.value = Math.min(audio.currentTime, audioBuffer.duration).toFixed(1);
-    updateTimeline();
-  });
+  // MP3 Encoding Helper with lamejs
+  function encodeMp3(buffer, kbps) {
+    return new Promise((resolve, reject) => {
+      try {
+        const channels = buffer.numberOfChannels;
+        const sampleRate = buffer.sampleRate;
+        const mp3encoder = new lamejs.Mp3Encoder(channels, sampleRate, kbps);
+        const mp3Data = [];
 
-  setEnd.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    endTime.value = Math.min(audio.currentTime, audioBuffer.duration).toFixed(1);
-    updateTimeline();
-  });
+        const left = buffer.getChannelData(0);
+        const right = channels > 1 ? buffer.getChannelData(1) : null;
 
-  setCutStart.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    cutStart.value = Math.max(Number(startTime.value),Math.min(audio.currentTime,Number(cutEnd.value))).toFixed(1);
-    updateTimeline();
-  });
-  setCutEnd.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    cutEnd.value = Math.min(Number(cut2Start.value),Math.max(audio.currentTime,Number(cutStart.value))).toFixed(1);
-    updateTimeline();
-  });
-  previewCut.addEventListener('click', async () => {
-    const cs = Number(cutStart.value), ce = Number(cutEnd.value);
-    if (!(ce > cs)) return showStatus('カット終了はカット開始より後にしてください。','error');
-    clearInterval(previewTimer); audio.currentTime = cs; await audio.play();
-    previewTimer = setInterval(() => { if (audio.currentTime >= ce || audio.ended){ audio.pause(); clearInterval(previewTimer); } },50);
-  });
-  setCut2Start.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    cut2Start.value = Math.max(Number(cutEnd.value),Math.min(audio.currentTime,Number(cut2End.value))).toFixed(1);
-    updateTimeline();
-  });
-  setCut2End.addEventListener('click', () => {
-    if (!audioBuffer) return;
-    cut2End.value = Math.min(Number(endTime.value),Math.max(audio.currentTime,Number(cut2Start.value))).toFixed(1);
-    updateTimeline();
-  });
-  previewCut2.addEventListener('click', async () => {
-    const cs = Number(cut2Start.value), ce = Number(cut2End.value);
-    if (!(ce > cs)) return showStatus('カット2の終了は開始より後にしてください。','error');
-    clearInterval(previewTimer); audio.currentTime = cs; await audio.play();
-    previewTimer = setInterval(() => { if (audio.currentTime >= ce || audio.ended){ audio.pause(); clearInterval(previewTimer); } },50);
-  });
+        const left16 = floatTo16Bit(left);
+        const right16 = right ? floatTo16Bit(right) : null;
 
-  previewBtn.addEventListener('click', async () => {
-    if (!audioBuffer) return;
-    const s = Number(startTime.value);
-    const e = Number(endTime.value);
-    if (!(e > s)) {
-      showStatus('終了位置は開始位置より後にしてください。','error');
-      return;
-    }
-    clearInterval(previewTimer);
-    audio.currentTime = s;
-    await audio.play();
-    previewTimer = setInterval(() => {
-      if (audio.currentTime >= e || audio.ended) {
-        audio.pause();
-        clearInterval(previewTimer);
-      }
-    }, 50);
-  });
+        const sampleBlockSize = 1152;
+        let i = 0;
 
-  function floatTo16BitPCM(float32Array){
-    const out = new Int16Array(float32Array.length);
-    for(let i=0;i<float32Array.length;i++){
-      const s = Math.max(-1, Math.min(1, float32Array[i]));
-      out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
-    }
-    return out;
-  }
+        function processChunk() {
+          const end = Math.min(i + sampleBlockSize * 100, left16.length);
+          for (; i < end; i += sampleBlockSize) {
+            const leftChunk = left16.subarray(i, i + sampleBlockSize);
+            let mp3buf;
+            if (channels === 2) {
+              const rightChunk = right16.subarray(i, i + sampleBlockSize);
+              mp3buf = mp3encoder.encodeBuffer(leftChunk, rightChunk);
+            } else {
+              mp3buf = mp3encoder.encodeBuffer(leftChunk);
+            }
+            if (mp3buf.length > 0) mp3Data.push(mp3buf);
+          }
 
-  processBtn.addEventListener('click', async () => {
-    if (!audioBuffer) return;
-    if (typeof lamejs === 'undefined'){
-      showStatus('MP3エンコーダー(lamejs)を読み込めませんでした。インターネット接続またはCDN制限を確認してください。','error');
-      return;
-    }
+          const percent = Math.floor((i / left16.length) * 80) + 10;
+          showProgress(percent, `MP3エンコード中 (${percent}%)...`);
 
-    let s = Number(startTime.value);
-    let e = Number(endTime.value);
-    let f = Number(fadeTime.value);
-    let cs = Number(cutStart.value), ce = Number(cutEnd.value);
-    let cs2 = Number(cut2Start.value), ce2 = Number(cut2End.value);
-
-    if (!Number.isFinite(s) || !Number.isFinite(e) || !Number.isFinite(f)){
-      showStatus('数値を正しく入力してください。','error');
-      return;
-    }
-    s = Math.max(0,s);
-    e = Math.min(audioBuffer.duration,e);
-    if (e <= s){
-      showStatus('終了位置は開始位置より後にしてください。','error');
-      return;
-    }
-    f = Math.max(0, Math.min(f, e-s));
-    if (cutEnabled.checked && (![cs,ce,cs2,ce2].every(Number.isFinite) || cs < s || ce <= cs || cs2 < ce || ce2 <= cs2 || ce2 > e)){
-      showStatus('2つのカット範囲を、重ならないよう「カット1 → カット2」の順で指定してください。','error');
-      return;
-    }
-
-    processBtn.disabled = true;
-    progress.style.display = 'block';
-    progress.value = 5;
-    downloadLink.style.display = 'none';
-    showStatus('音声を切り出しています…');
-
-    try{
-      const sr = audioBuffer.sampleRate;
-      const startSample = Math.floor(s * sr);
-      const endSample = Math.floor(e * sr);
-      const cutStartSample = cutEnabled.checked ? Math.floor(cs*sr) : endSample;
-      const cutEndSample = cutEnabled.checked ? Math.floor(ce*sr) : endSample;
-      const cut2StartSample = cutEnabled.checked ? Math.floor(cs2*sr) : endSample;
-      const cut2EndSample = cutEnabled.checked ? Math.floor(ce2*sr) : endSample;
-      const removedSamples = cutEnabled.checked ? (cutEndSample-cutStartSample)+(cut2EndSample-cut2StartSample) : 0;
-      const length = endSample-startSample-removedSamples;
-      f = Math.min(f,length/sr);
-      const channels = Math.min(2, audioBuffer.numberOfChannels);
-
-      let left = new Float32Array(length);
-      let right = channels > 1 ? new Float32Array(length) : null;
-
-      const ranges = cutEnabled.checked
-        ? [[startSample,cutStartSample],[cutEndSample,cut2StartSample],[cut2EndSample,endSample]]
-        : [[startSample,endSample]];
-      const copyRanges = (source,target) => {
-        let offset = 0;
-        for (const [from,to] of ranges){ target.set(source.subarray(from,to),offset); offset += to-from; }
-      };
-      copyRanges(audioBuffer.getChannelData(0),left);
-      if (channels > 1) copyRanges(audioBuffer.getChannelData(1),right);
-
-      if (cutEnabled.checked){
-        const joins = [cutStartSample-startSample, (cutStartSample-startSample)+(cut2StartSample-cutEndSample)];
-        for (const join of joins){
-          const cross = Math.min(Math.floor(sr*.01),join,length-join);
-          for(let i=0;i<cross;i++){
-            const mix = i/cross, a = join-cross+i, b = join+i;
-            left[a] *= 1-mix; left[b] *= mix;
-            if (right){ right[a] *= 1-mix; right[b] *= mix; }
+          if (i < left16.length) {
+            setTimeout(processChunk, 0);
+          } else {
+            const mp3buf = mp3encoder.flush();
+            if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            const blob = new Blob(mp3Data, { type: 'audio/mp3' });
+            resolve(blob);
           }
         }
+
+        processChunk();
+      } catch (err) {
+        reject(err);
       }
+    });
+  }
 
-      progress.value = 20;
-      showStatus('フェードアウトを適用しています…');
+  function floatTo16Bit(input) {
+    const output = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) {
+      const s = Math.max(-1, Math.min(1, input[i]));
+      output[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+    }
+    return output;
+  }
 
-      const fadeSamples = Math.floor(f * sr);
-      if (fadeSamples > 0){
-        const fadeStart = length - fadeSamples;
-        for(let i=0;i<fadeSamples;i++){
-          const gain = 1 - (i / fadeSamples);
-          const idx = fadeStart + i;
-          left[idx] *= gain;
-          if (right) right[idx] *= gain;
-        }
-      }
+  function finishExport(blob, filename) {
+    showProgress(100, '完了しました！');
+    const url = URL.createObjectURL(blob);
+    downloadLink.href = url;
+    downloadLink.download = filename;
+    downloadLink.textContent = `ダウンロード (${formatBytes(blob.size)}) - ${filename}`;
+    downloadLink.classList.remove('hidden');
+  }
 
-      if (normalize.checked){
-        showStatus('ノーマライズを適用しています…');
-        let peak = 0;
-        for(let i=0;i<left.length;i++){
-          const a = Math.abs(left[i]);
-          if (a > peak) peak = a;
-        }
-        if (right){
-          for(let i=0;i<right.length;i++){
-            const a = Math.abs(right[i]);
-            if (a > peak) peak = a;
-          }
-        }
-        if (peak > 0){
-          const targetPeak = Math.pow(10, -1/20); // 約 -1 dBFS
-          const gain = Math.min(targetPeak / peak, 8); // 過度な増幅を抑える
-          for(let i=0;i<left.length;i++) left[i] *= gain;
-          if (right) for(let i=0;i<right.length;i++) right[i] *= gain;
-        }
-      }
+  function showProgress(percent, text) {
+    progressBox.classList.remove('hidden');
+    progressBox.classList.add('flex');
+    progressBar.style.width = `${percent}%`;
+    statusText.textContent = text;
+  }
 
-      const left16 = floatTo16BitPCM(left);
-      const right16 = right ? floatTo16BitPCM(right) : null;
+  function hideProgress() {
+    progressBox.classList.add('hidden');
+    progressBox.classList.remove('flex');
+  }
 
-      progress.value = 35;
-      showStatus('MP3へ変換しています…');
-
-      const kbps = 192;
-      const encoder = new lamejs.Mp3Encoder(channels, sr, kbps);
-      const mp3Data = [];
-      const blockSize = 1152;
-
-      for(let i=0;i<left16.length;i+=blockSize){
-        const l = left16.subarray(i, i+blockSize);
-        let buf;
-        if (channels === 2){
-          const r = right16.subarray(i, i+blockSize);
-          buf = encoder.encodeBuffer(l,r);
-        }else{
-          buf = encoder.encodeBuffer(l);
-        }
-        if (buf.length) mp3Data.push(new Int8Array(buf));
-        if (i % (blockSize*50) === 0){
-          progress.value = 35 + Math.min(55, Math.floor((i/left16.length)*55));
-          await new Promise(r => setTimeout(r,0));
-        }
-      }
-
-      const endBuf = encoder.flush();
-      if (endBuf.length) mp3Data.push(new Int8Array(endBuf));
-
-      progress.value = 95;
-      const blob = new Blob(mp3Data, {type:'audio/mpeg'});
-      const url = URL.createObjectURL(blob);
-
-      let name = outputName.value.trim() || 'trimmed_fadeout.mp3';
-      if (!name.toLowerCase().endsWith('.mp3')) name += '.mp3';
-
-      downloadLink.href = url;
-      downloadLink.download = name;
-      downloadLink.textContent = `MP3をダウンロード（${(blob.size/1024/1024).toFixed(2)} MB）`;
-      downloadLink.style.display = 'inline-flex';
-
-      progress.value = 100;
-      const removedDuration = cutEnabled.checked ? (ce-cs)+(ce2-cs2) : 0;
-      const outDuration = (e-s)-removedDuration;
-      showStatus(`完成しました。\n長さ: ${outDuration.toFixed(2)}秒 / 途中カット: ${cutEnabled.checked ? `2カ所・合計${removedDuration.toFixed(2)}秒` : 'なし'} / フェードアウト: ${f.toFixed(2)}秒 / ノーマライズ: ${normalize.checked ? 'ON' : 'OFF'} / 192kbps MP3`,'ok');
-    }catch(err){
-      console.error(err);
-      showStatus('処理中にエラーが発生しました: ' + (err?.message || err),'error');
-    }finally{
-      processBtn.disabled = false;
+  // Keyboard Shortcuts (Space key to play/pause)
+  window.addEventListener('keydown', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      togglePlay();
     }
   });
 
-  drawWaveform();
-
-  window.addEventListener('beforeunload', () => {
-    stopEditedPreview();
-    if (objectUrl) URL.revokeObjectURL(objectUrl);
-  });
 })();
 </script>
 </body>
