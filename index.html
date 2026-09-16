@@ -412,6 +412,7 @@
 
   let editedPreviewSource = null;
   let editedPreviewCtx = null;
+  let isStartingEditedPreview = false;
 
   // Cut sections array: [{ id, start, end }]
   let cutSections = [];
@@ -1099,8 +1100,14 @@
     if (totalSamples <= 0) throw new Error('全区間がカットされています。残す範囲を設定してください。');
 
     const numChannels = audioBuffer.numberOfChannels;
-    const offlineCtx = new OfflineAudioContext(numChannels, totalSamples, sampleRate);
-    const outputBuffer = offlineCtx.createBuffer(numChannels, totalSamples, sampleRate);
+
+    // Reuse the AudioContext that decoded the source file. Creating an
+    // OfflineAudioContext only to allocate the result buffer can make preview
+    // playback unreliable on iPad/Safari.
+    if (!audioContext) {
+      audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    const outputBuffer = audioContext.createBuffer(numChannels, totalSamples, sampleRate);
 
     const gainFactor = (parseFloat(gainInput.value) || 100) / 100;
     const fadeInSec = Math.max(0, parseFloat(fadeInInput.value) || 0);
@@ -1163,42 +1170,65 @@
   }
 
   // Real-time Preview of Edited Result
-  previewEditedBtn.addEventListener('click', () => {
+  previewEditedBtn.addEventListener('click', async () => {
+    if (isStartingEditedPreview) return;
+
     if (editedPreviewSource) {
       stopEditedPreview();
       return;
     }
 
     try {
+      isStartingEditedPreview = true;
       stopPlayback();
       const processedBuffer = processAudioBuffer();
       if (!processedBuffer) return;
 
-      editedPreviewCtx = new (window.AudioContext || window.webkitAudioContext)();
-      editedPreviewSource = editedPreviewCtx.createBufferSource();
-      editedPreviewSource.buffer = processedBuffer;
-      editedPreviewSource.connect(editedPreviewCtx.destination);
+      // Resume from the button click. This is required by iPad/Safari's
+      // autoplay policy and is more stable than creating a new context for
+      // every preview.
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
 
-      editedPreviewSource.onended = () => stopEditedPreview();
-      editedPreviewSource.start();
+      editedPreviewCtx = audioContext;
+      const previewSource = editedPreviewCtx.createBufferSource();
+      previewSource.buffer = processedBuffer;
+      previewSource.connect(editedPreviewCtx.destination);
+      editedPreviewSource = previewSource;
+
+      // An old source may fire onended after a new preview has started. Only
+      // the source that is still current is allowed to reset the preview.
+      previewSource.onended = () => {
+        if (editedPreviewSource === previewSource) {
+          stopEditedPreview(false);
+        }
+      };
+      previewSource.start(0);
 
       previewEditedBtn.innerHTML = '<i class="fa-solid fa-square"></i><span>プレビュー停止</span>';
       previewEditedBtn.classList.replace('from-emerald-600', 'from-rose-600');
       previewEditedBtn.classList.replace('to-teal-600', 'to-rose-700');
     } catch (err) {
+      stopEditedPreview();
       alert(err.message || 'プレビュー再生に失敗しました');
+    } finally {
+      isStartingEditedPreview = false;
     }
   });
 
-  function stopEditedPreview() {
+  function stopEditedPreview(shouldStopSource = true) {
     if (editedPreviewSource) {
-      try { editedPreviewSource.stop(); } catch (_) {}
+      const sourceToStop = editedPreviewSource;
       editedPreviewSource = null;
+      sourceToStop.onended = null;
+      if (shouldStopSource) {
+        try { sourceToStop.stop(); } catch (_) {}
+      }
     }
-    if (editedPreviewCtx) {
-      editedPreviewCtx.close().catch(() => {});
-      editedPreviewCtx = null;
-    }
+    // Keep the shared context alive. Repeatedly closing and recreating it is
+    // a common cause of silent or interrupted previews on iOS/iPadOS.
+    editedPreviewCtx = null;
     previewEditedBtn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles"></i><span>編集結果（完成版）を試聴</span>';
     previewEditedBtn.classList.replace('from-rose-600', 'from-emerald-600');
     previewEditedBtn.classList.replace('to-rose-700', 'to-teal-600');
