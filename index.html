@@ -183,7 +183,7 @@
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span> 赤: カット区間</span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span> 緑線: 再生位置</span>
           </div>
-          <div>※ 波形上をドラッグしてハンドル操作、クリックで再生位置指定が可能です</div>
+          <div>※ 青いハンドルはトリミング、赤いハンドルは選択中の途中カット区間です</div>
         </div>
       </div>
 
@@ -288,6 +288,9 @@
         <div id="cutList" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
           <p id="noCutText" class="text-xs text-slate-500 text-center py-4">カット区間は追加されていません</p>
         </div>
+        <p class="text-[11px] leading-relaxed text-slate-500">
+          「区間追加」後、波形下側の赤い左右ハンドルを指またはマウスで動かして範囲を選べます。複数ある場合は一覧または波形の赤い区間を押して選択します。
+        </p>
       </div>
 
       <!-- Output & Export Card -->
@@ -413,6 +416,7 @@
   // Cut sections array: [{ id, start, end }]
   let cutSections = [];
   let nextCutId = 1;
+  let selectedCutId = null;
 
   // Dragging state for waveform handles
   let activeHandle = null; // 'start', 'end', or cut handle e.g. 'cut-1-start'
@@ -511,11 +515,12 @@
       const csPos = (Math.max(sTime, cut.start) / duration) * width;
       const cePos = (Math.min(eTime, cut.end) / duration) * width;
       if (cePos > csPos) {
-        ctx.fillStyle = 'rgba(244, 63, 94, 0.25)';
+        const isSelected = cut.id === selectedCutId;
+        ctx.fillStyle = isSelected ? 'rgba(244, 63, 94, 0.36)' : 'rgba(244, 63, 94, 0.22)';
         ctx.fillRect(csPos, 0, cePos - csPos, height);
         
-        ctx.strokeStyle = '#f43f5e';
-        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = isSelected ? '#fb7185' : '#f43f5e';
+        ctx.lineWidth = isSelected ? 2.5 : 1.5;
         ctx.strokeRect(csPos, 0, cePos - csPos, height);
       }
     });
@@ -570,6 +575,37 @@
     ctx.arc(ePos, 16, 12, 0, Math.PI * 2); /* Increased handle size for touch */
     ctx.fill();
 
+    // Selected cut start/end handles. Placed at the bottom so they do not
+    // overlap with the blue trim handles at the top.
+    const selectedCut = cutSections.find(cut => cut.id === selectedCutId);
+    if (selectedCut) {
+      const cutStartPos = (selectedCut.start / duration) * width;
+      const cutEndPos = (selectedCut.end / duration) * width;
+
+      ctx.strokeStyle = '#fb7185';
+      ctx.fillStyle = '#f43f5e';
+      ctx.lineWidth = 3;
+
+      [cutStartPos, cutEndPos].forEach(pos => {
+        ctx.beginPath();
+        ctx.moveTo(pos, 0);
+        ctx.lineTo(pos, height);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(pos, height - 16, 13, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('\u2194', cutStartPos, height - 16);
+      ctx.fillText('\u2194', cutEndPos, height - 16);
+      ctx.textBaseline = 'alphabetic';
+    }
+
     // Current Playhead Position (Green Line)
     if (currentTime >= 0) {
       const playX = (currentTime / duration) * width;
@@ -596,6 +632,18 @@
   let initialPinchDistance = null;
   let initialZoomLevel = 1;
   let isScrubbing = false;
+
+  function selectCut(cutId) {
+    selectedCutId = cutId;
+    renderCutList();
+  }
+
+  function updateCutInputs(cut) {
+    const item = cutList.querySelector(`[data-cut-id="${cut.id}"]`);
+    if (!item) return;
+    item.querySelector('.cut-start').value = cut.start.toFixed(1);
+    item.querySelector('.cut-end').value = cut.end.toFixed(1);
+  }
 
   function handlePointerDown(e) {
     if (!audioBuffer) return;
@@ -624,6 +672,40 @@
     const ePos = (eTime / duration) * rect.width;
 
     const hitThreshold = 30; // Increased hit area for touch (iPad)
+
+    // Cut handles take priority. Choose the closest edge so even a short cut
+    // can have both its start and end adjusted reliably on a touch screen.
+    const cutHandle = cutSections.flatMap(cut => [
+      { cut, edge: 'start', distance: Math.abs(x - (cut.start / duration) * rect.width) },
+      { cut, edge: 'end', distance: Math.abs(x - (cut.end / duration) * rect.width) }
+    ])
+      .filter(candidate => candidate.distance <= hitThreshold)
+      .sort((a, b) => {
+        if (a.distance !== b.distance) return a.distance - b.distance;
+        return Number(b.cut.id === selectedCutId) - Number(a.cut.id === selectedCutId);
+      })[0];
+
+    if (cutHandle) {
+      selectedCutId = cutHandle.cut.id;
+      activeHandle = `cut-${cutHandle.cut.id}-${cutHandle.edge}`;
+      isScrubbing = false;
+      e.preventDefault();
+      renderCutList();
+      return;
+    }
+
+    // Tapping inside a red area selects that cut. A second touch near either
+    // red edge can then drag it, which is easier on a small iPad screen.
+    const tappedTime = (x / rect.width) * duration;
+    const tappedCut = [...cutSections].reverse().find(cut => tappedTime >= cut.start && tappedTime <= cut.end);
+    if (tappedCut && tappedCut.id !== selectedCutId) {
+      selectedCutId = tappedCut.id;
+      activeHandle = null;
+      isScrubbing = false;
+      e.preventDefault();
+      renderCutList();
+      return;
+    }
 
     if (Math.abs(x - sPos) <= hitThreshold) {
       activeHandle = 'start';
@@ -678,6 +760,21 @@
       const curStart = parseFloat(startTimeInput.value) || 0;
       const newEnd = Math.min(duration, Math.max(t, curStart + 0.1));
       endTimeInput.value = newEnd.toFixed(1);
+    } else if (activeHandle && activeHandle.startsWith('cut-')) {
+      const match = activeHandle.match(/^cut-(\d+)-(start|end)$/);
+      if (match) {
+        const cut = cutSections.find(c => c.id === Number(match[1]));
+        if (cut) {
+          const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
+          const trimEnd = Math.min(duration, parseFloat(endTimeInput.value) || duration);
+          if (match[2] === 'start') {
+            cut.start = Math.max(trimStart, Math.min(t, cut.end - 0.1));
+          } else {
+            cut.end = Math.min(trimEnd, Math.max(t, cut.start + 0.1));
+          }
+          updateCutInputs(cut);
+        }
+      }
     } else if (isScrubbing) {
       // Scrubbing playhead
       currentTime = Math.max(0, Math.min(duration, t));
@@ -702,6 +799,7 @@
   waveCanvas.addEventListener('touchstart', handlePointerDown, { passive: false });
   waveCanvas.addEventListener('touchmove', handlePointerMove, { passive: false });
   window.addEventListener('touchend', handlePointerUp);
+  window.addEventListener('touchcancel', handlePointerUp);
 
   // Resize Event for iPad Orientation Change
   window.addEventListener('resize', () => {
@@ -752,6 +850,12 @@
       startTimeInput.value = '0.0';
       endTimeInput.value = audioBuffer.duration.toFixed(1);
       outputNameInput.value = file.name.replace(/\.[^/.]+$/, "") + "_edited";
+
+      // A newly loaded file starts with a clean cut list.
+      cutSections = [];
+      nextCutId = 1;
+      selectedCutId = null;
+      renderCutList();
 
       audioElement.src = URL.createObjectURL(file);
 
@@ -832,16 +936,23 @@
   function renderCutList() {
     cutList.innerHTML = '';
     if (cutSections.length === 0) {
+      selectedCutId = null;
       cutList.appendChild(noCutText);
       drawWaveform();
       return;
     }
 
+    if (!cutSections.some(cut => cut.id === selectedCutId)) {
+      selectedCutId = cutSections[0].id;
+    }
+
     cutSections.forEach((cut, index) => {
       const item = document.createElement('div');
-      item.className = 'flex items-center gap-2 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs';
+      item.dataset.cutId = cut.id;
+      const isSelected = cut.id === selectedCutId;
+      item.className = `flex items-center gap-2 bg-slate-950 border rounded-xl p-2.5 text-xs cursor-pointer transition ${isSelected ? 'border-rose-400 ring-1 ring-rose-400/50' : 'border-slate-800 hover:border-slate-700'}`;
       item.innerHTML = `
-        <span class="font-bold text-rose-400">#${index + 1}</span>
+        <span class="font-bold text-rose-400">#${index + 1}${isSelected ? '<span class="block text-[9px] text-rose-300">選択中</span>' : ''}</span>
         <div class="grid grid-cols-2 gap-2 flex-1">
           <div>
             <span class="text-[10px] text-slate-500 block">開始(秒)</span>
@@ -857,20 +968,34 @@
         </button>
       `;
 
+      item.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-cut')) return;
+        if (selectedCutId !== cut.id) selectCut(cut.id);
+      });
+
       item.querySelector('.cut-start').addEventListener('change', (e) => {
-        cut.start = Math.max(0, parseFloat(e.target.value) || 0);
+        const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
+        cut.start = Math.max(trimStart, Math.min(parseFloat(e.target.value) || trimStart, cut.end - 0.1));
+        e.target.value = cut.start.toFixed(1);
+        selectedCutId = cut.id;
         stopEditedPreview();
-        drawWaveform();
+        renderCutList();
       });
 
       item.querySelector('.cut-end').addEventListener('change', (e) => {
-        cut.end = Math.max(cut.start + 0.1, parseFloat(e.target.value) || cut.start + 0.1);
+        const trimEnd = Math.min(audioBuffer.duration, parseFloat(endTimeInput.value) || audioBuffer.duration);
+        cut.end = Math.min(trimEnd, Math.max(cut.start + 0.1, parseFloat(e.target.value) || cut.start + 0.1));
+        e.target.value = cut.end.toFixed(1);
+        selectedCutId = cut.id;
         stopEditedPreview();
-        drawWaveform();
+        renderCutList();
       });
 
       item.querySelector('.remove-cut').addEventListener('click', () => {
         cutSections = cutSections.filter(c => c.id !== cut.id);
+        if (selectedCutId === cut.id) {
+          selectedCutId = cutSections.length ? cutSections[0].id : null;
+        }
         stopEditedPreview();
         renderCutList();
       });
@@ -890,11 +1015,13 @@
     const defaultCutStart = s + (e - s) * 0.4;
     const defaultCutEnd = s + (e - s) * 0.6;
 
-    cutSections.push({
+    const newCut = {
       id: nextCutId++,
       start: parseFloat(defaultCutStart.toFixed(1)),
       end: parseFloat(defaultCutEnd.toFixed(1))
-    });
+    };
+    cutSections.push(newCut);
+    selectedCutId = newCut.id;
 
     stopEditedPreview();
     renderCutList();
