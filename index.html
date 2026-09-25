@@ -124,7 +124,7 @@
       </div>
 
       <!-- File Meta Bar (Hidden until loaded) -->
-      <div id="metaBar" class="hidden grid-cols-2 sm:grid-cols-4 gap-3">
+      <div id="metaBar" class="hidden grid-cols-2 sm:grid-cols-5 gap-3">
         <div class="bg-slate-900 border border-slate-800 rounded-xl p-3">
           <div class="text-xs text-slate-500">ファイル名</div>
           <div id="fileName" class="text-sm font-medium text-slate-200 truncate">-</div>
@@ -141,6 +141,13 @@
           <div class="text-xs text-slate-500">サイズ</div>
           <div id="fileSize" class="text-sm font-medium text-slate-200">-</div>
         </div>
+        <button id="resetFileBtn" type="button" class="col-span-2 sm:col-span-1 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/40 hover:border-rose-400 rounded-xl p-3 text-left transition flex sm:flex-col items-center sm:items-start justify-center gap-2" title="選択したファイルと編集内容を取り消します">
+          <i class="fa-solid fa-arrow-rotate-left text-rose-400"></i>
+          <span>
+            <span class="text-sm font-bold text-rose-300 block">ファイルを解除</span>
+            <span class="text-[10px] text-rose-300/70 block">最初の状態に戻す</span>
+          </span>
+        </button>
       </div>
 
       <!-- Waveform Studio Display Card -->
@@ -179,7 +186,7 @@
         <!-- Help Guide Badge -->
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-1">
           <div class="flex items-center gap-4">
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> 青: 残す区間</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> 青: 残す区間（音量・フェード反映）</span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span> 赤: カット区間</span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span> 緑線: 再生位置</span>
           </div>
@@ -385,6 +392,7 @@
   const fileDurationEl = $('fileDuration');
   const fileSampleRateEl = $('fileSampleRate');
   const fileSizeEl = $('fileSize');
+  const resetFileBtn = $('resetFileBtn');
   const waveCanvas = $('waveCanvas');
   const waveCtx = waveCanvas.getContext('2d');
   const waveScrollContainer = $('waveScrollContainer');
@@ -434,7 +442,11 @@
   // Audio Context & State
   let audioContext = null;
   let audioBuffer = null;
+  let sourceObjectUrl = null;
+  let downloadObjectUrl = null;
   let peaks = [];
+  let peaksRevision = 0;
+  let waveformEffectCache = null;
   let zoomLevel = 1;
 
   let currentTime = 0;
@@ -551,6 +563,8 @@
       }
       peaks.push(max);
     }
+    peaksRevision++;
+    waveformEffectCache = null;
     resizeCanvas();
   }
 
@@ -567,6 +581,75 @@
     waveCtx.scale(dpr, dpr);
 
     drawWaveform();
+  }
+
+  function getWaveformEffectModel() {
+    if (!audioBuffer || peaks.length === 0) return null;
+
+    const gainValue = parseFloat(gainInput.value);
+    const gainFactor = Number.isFinite(gainValue) ? Math.max(0, gainValue) / 100 : 1;
+    const fadeInValue = parseFloat(fadeInInput.value);
+    const fadeOutValue = parseFloat(fadeOutInput.value);
+    const fadeInSec = Number.isFinite(fadeInValue) ? Math.max(0, fadeInValue) : 0;
+    const fadeOutSec = Number.isFinite(fadeOutValue) ? Math.max(0, fadeOutValue) : 0;
+    const normalize = normalizeInput.checked;
+    const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
+    const trimEnd = Math.min(audioBuffer.duration, parseFloat(endTimeInput.value) || audioBuffer.duration);
+    const cutsKey = cutSections.map(cut => `${cut.id}:${cut.start}:${cut.end}`).join(';');
+    const cacheKey = [peaksRevision, gainFactor, fadeInSec, fadeOutSec, normalize, trimStart, trimEnd, cutsKey].join('|');
+
+    if (waveformEffectCache && waveformEffectCache.key === cacheKey) {
+      return waveformEffectCache.model;
+    }
+
+    const timeline = buildEditedTimeline();
+    const totalEditedDuration = timeline.length ? timeline[timeline.length - 1].editedEnd : 0;
+    const effectiveFadeIn = Math.min(fadeInSec, totalEditedDuration);
+    const effectiveFadeOut = Math.min(fadeOutSec, totalEditedDuration);
+
+    function sourceToEditedTime(sourceTime) {
+      for (const segment of timeline) {
+        if (sourceTime >= segment.sourceStart && sourceTime < segment.sourceEnd) {
+          return segment.editedStart + (sourceTime - segment.sourceStart);
+        }
+      }
+      return null;
+    }
+
+    function envelopeAt(editedTime) {
+      let factor = 1;
+      if (effectiveFadeIn > 0 && editedTime < effectiveFadeIn) {
+        factor *= Math.max(0, Math.min(1, editedTime / effectiveFadeIn));
+      }
+      if (effectiveFadeOut > 0 && editedTime > totalEditedDuration - effectiveFadeOut) {
+        factor *= Math.max(0, Math.min(1, (totalEditedDuration - editedTime) / effectiveFadeOut));
+      }
+      return factor;
+    }
+
+    let normalizeFactor = 1;
+    if (normalize) {
+      let maxAdjustedPeak = 0;
+      for (let i = 0; i < peaks.length; i++) {
+        const sourceTime = ((i + 0.5) / peaks.length) * audioBuffer.duration;
+        const editedTime = sourceToEditedTime(sourceTime);
+        if (editedTime === null) continue;
+        const adjustedPeak = peaks[i] * gainFactor * envelopeAt(editedTime);
+        if (adjustedPeak > maxAdjustedPeak) maxAdjustedPeak = adjustedPeak;
+      }
+      if (maxAdjustedPeak > 0) normalizeFactor = 0.89 / maxAdjustedPeak;
+    }
+
+    const model = {
+      adjustedPeak(sourceTime, originalPeak) {
+        const editedTime = sourceToEditedTime(sourceTime);
+        if (editedTime === null) return null;
+        return Math.max(0, Math.min(1, originalPeak * gainFactor * envelopeAt(editedTime) * normalizeFactor));
+      }
+    };
+
+    waveformEffectCache = { key: cacheKey, model };
+    return model;
   }
 
   // Render Waveform Canvas
@@ -622,17 +705,22 @@
     // Draw Peaks (Waveform lines)
     const midY = height / 2;
     const barWidth = width / peaks.length;
+    const effectModel = getWaveformEffectModel();
 
     ctx.fillStyle = '#3b82f6';
     for (let i = 0; i < peaks.length; i++) {
       const x = i * barWidth;
       const peak = peaks[i];
-      const barHeight = Math.max(2, peak * (height * 0.42));
 
       // Dim color if out of bounds or cut
-      const timeAtX = (x / width) * duration;
+      const timeAtX = ((i + 0.5) / peaks.length) * duration;
       const isCut = cutSections.some(c => timeAtX >= c.start && timeAtX <= c.end);
       const isTrimmedOut = timeAtX < sTime || timeAtX > eTime;
+      const adjustedPeak = (!isCut && !isTrimmedOut && effectModel)
+        ? effectModel.adjustedPeak(timeAtX, peak)
+        : null;
+      const displayedPeak = adjustedPeak === null ? peak : adjustedPeak;
+      const barHeight = Math.max(1, displayedPeak * (height * 0.42));
 
       if (isCut) {
         ctx.fillStyle = '#fb7185';
@@ -976,6 +1064,82 @@
     }
   });
 
+  function resetEditor() {
+    stopPlayback(false, false);
+    stopEditedPreview(true, true, false);
+    cancelPlaybackAnimation();
+
+    if (sourceObjectUrl) {
+      URL.revokeObjectURL(sourceObjectUrl);
+      sourceObjectUrl = null;
+    }
+    if (downloadObjectUrl) {
+      URL.revokeObjectURL(downloadObjectUrl);
+      downloadObjectUrl = null;
+    }
+
+    audioElement.pause();
+    audioElement.removeAttribute('src');
+    audioElement.load();
+    fileInput.value = '';
+
+    audioBuffer = null;
+    peaks = [];
+    peaksRevision++;
+    waveformEffectCache = null;
+    currentTime = 0;
+    isPlaying = false;
+    zoomLevel = 1;
+    zoomSlider.value = '1';
+    waveScrollContainer.scrollLeft = 0;
+
+    cutSections = [];
+    nextCutId = 1;
+    selectedCutId = null;
+    activeHandle = null;
+    isScrubbing = false;
+    scrubResumeMode = null;
+    editedPreviewBuffer = null;
+    editedTimeline = [];
+
+    startTimeInput.value = '0.0';
+    endTimeInput.value = '0.0';
+    fadeInInput.value = '0';
+    fadeOutInput.value = '2.0';
+    gainInput.value = '100';
+    gainValueText.textContent = '100%';
+    normalizeInput.checked = true;
+    outputNameInput.value = 'edited_audio';
+    formatSelect.value = 'wav';
+    bitrateSelect.value = '192';
+    bitrateContainer.classList.add('hidden');
+
+    fileNameEl.textContent = '-';
+    fileDurationEl.textContent = '-';
+    fileSampleRateEl.textContent = '-';
+    fileSizeEl.textContent = '-';
+    metaBar.classList.add('hidden');
+    metaBar.classList.remove('grid');
+
+    downloadLink.classList.add('hidden');
+    downloadLink.removeAttribute('href');
+    downloadLink.removeAttribute('download');
+    downloadLink.textContent = '';
+    progressBar.style.width = '0%';
+    statusText.textContent = '';
+    hideProgress();
+
+    [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, exportBtn].forEach(button => {
+      button.disabled = true;
+    });
+    setOriginalButtonPlaying(false);
+    setEditedButtonPlaying(false);
+    setPlaybackState('idle', '音声ファイルを選択してください');
+    rangeText.textContent = '0:00.0 - 0:00.0';
+    renderCutList();
+    drawWaveform();
+  }
+
 
   // File Loading Handler
   dropzone.addEventListener('click', () => fileInput.click());
@@ -989,6 +1153,7 @@
   fileInput.addEventListener('change', (e) => {
     if (e.target.files.length) loadFile(e.target.files[0]);
   });
+  resetFileBtn.addEventListener('click', resetEditor);
 
   async function loadFile(file) {
     stopPlayback();
@@ -1024,7 +1189,18 @@
       editedTimeline = [];
       renderCutList();
 
-      audioElement.src = URL.createObjectURL(file);
+      if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
+      sourceObjectUrl = URL.createObjectURL(file);
+      audioElement.src = sourceObjectUrl;
+
+      if (downloadObjectUrl) {
+        URL.revokeObjectURL(downloadObjectUrl);
+        downloadObjectUrl = null;
+      }
+      downloadLink.classList.add('hidden');
+      downloadLink.removeAttribute('href');
+      downloadLink.removeAttribute('download');
+      downloadLink.textContent = '';
 
       // Enable UI
       [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, exportBtn].forEach(b => b.disabled = false);
@@ -1226,6 +1402,12 @@
   gainInput.addEventListener('input', (e) => {
     gainValueText.textContent = `${e.target.value}%`;
     stopEditedPreview();
+    drawWaveform();
+  });
+
+  normalizeInput.addEventListener('change', () => {
+    stopEditedPreview();
+    drawWaveform();
   });
 
   // Zoom Handling
@@ -1296,7 +1478,8 @@
     }
     const outputBuffer = audioContext.createBuffer(numChannels, totalSamples, sampleRate);
 
-    const gainFactor = (parseFloat(gainInput.value) || 100) / 100;
+    const gainValue = parseFloat(gainInput.value);
+    const gainFactor = Number.isFinite(gainValue) ? Math.max(0, gainValue) / 100 : 1;
     const fadeInSec = Math.max(0, parseFloat(fadeInInput.value) || 0);
     const fadeOutSec = Math.max(0, parseFloat(fadeOutInput.value) || 0);
 
@@ -1704,8 +1887,9 @@
 
   function finishExport(blob, filename) {
     showProgress(100, '完了しました！');
-    const url = URL.createObjectURL(blob);
-    downloadLink.href = url;
+    if (downloadObjectUrl) URL.revokeObjectURL(downloadObjectUrl);
+    downloadObjectUrl = URL.createObjectURL(blob);
+    downloadLink.href = downloadObjectUrl;
     downloadLink.download = filename;
     downloadLink.textContent = `ダウンロード (${formatBytes(blob.size)}) - ${filename}`;
     downloadLink.classList.remove('hidden');
