@@ -187,10 +187,11 @@
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400 pt-1">
           <div class="flex items-center gap-4">
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500 inline-block"></span> 青: 残す区間（音量・フェード反映）</span>
-            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-rose-500/80 inline-block"></span> 赤: カット区間</span>
+            <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500 inline-block"></span> オレンジ: 削除候補</span>
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-link text-slate-400"></i> 削除後は前後を自動連結</span>
             <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-400 inline-block"></span> 緑線: 再生位置</span>
           </div>
-          <div>※ 青いハンドルはトリミング、赤いハンドルは選択中の途中カット区間です</div>
+          <div>※ 青いハンドルはトリミング、オレンジのハンドルは選択中の途中カット区間です</div>
         </div>
       </div>
 
@@ -308,21 +309,46 @@
 
       <!-- Cut Sections Management (Unlimited Dynamic Cuts) -->
       <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col gap-4 shadow-lg">
-        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="border-b border-slate-800 pb-3">
           <h2 class="text-base font-bold text-white flex items-center gap-2">
             <i class="fa-solid fa-trash-can text-rose-400"></i> 途中カット区間
           </h2>
-          <button id="addCutBtn" disabled class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 border border-rose-500/30 text-xs font-semibold transition flex items-center gap-1">
-            <i class="fa-solid fa-plus"></i> 区間追加
+        </div>
+
+        <div class="rounded-xl border border-slate-700 bg-slate-950/70 p-3">
+          <div class="text-xs font-bold text-white mb-2"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-slate-950 mr-1.5">1</span>削除する範囲を選ぶ</div>
+          <button id="addCutBtn" disabled class="w-full px-3 py-3 rounded-xl bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/50 text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-40">
+            <i class="fa-solid fa-vector-square"></i> 範囲を選択
+          </button>
+        </div>
+
+        <div id="pendingCutPanel" class="hidden rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 items-center justify-between gap-3">
+          <div>
+            <div class="text-xs font-bold text-amber-300"><span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-slate-950 mr-1.5">2</span>オレンジのハンドルで範囲を調整</div>
+            <div id="pendingCutText" class="text-xs font-mono text-amber-100 mt-0.5">0:00.0 ～ 0:00.0</div>
+          </div>
+          <button id="cancelCutSelectionBtn" type="button" class="shrink-0 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition">
+            選択を取消
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button id="commitCutBtn" disabled class="px-3 py-3 rounded-xl bg-rose-600 text-white hover:bg-rose-500 border border-rose-500 text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-30 disabled:hover:bg-rose-600">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white text-rose-600">3</span>
+            <i class="fa-solid fa-trash-can"></i> この範囲を削除
+          </button>
+          <button id="undoLastCutBtn" disabled class="px-3 py-3 rounded-xl bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/40 text-sm font-bold transition flex items-center justify-center gap-2 disabled:opacity-30">
+            <i class="fa-solid fa-rotate-left"></i> 元に戻す
           </button>
         </div>
 
         <!-- Cut List Container -->
+        <div class="text-[11px] font-bold text-slate-400 border-t border-slate-800 pt-3">削除履歴</div>
         <div id="cutList" class="flex flex-col gap-2 max-h-48 overflow-y-auto pr-1">
-          <p id="noCutText" class="text-xs text-slate-500 text-center py-4">カット区間は追加されていません</p>
+          <p id="noCutText" class="text-xs text-slate-500 text-center py-3">削除した範囲はありません</p>
         </div>
         <p class="text-[11px] leading-relaxed text-slate-500">
-          「区間追加」後、波形下側の赤い左右ハンドルを指またはマウスで動かして範囲を選べます。複数ある場合は一覧または波形の赤い区間を押して選択します。
+          削除すると、その区間の波形が消えます。「元に戻す」で直前の削除を取り消せます。
         </p>
       </div>
 
@@ -425,6 +451,11 @@
   const normalizeInput = $('normalizeInput');
 
   const addCutBtn = $('addCutBtn');
+  const commitCutBtn = $('commitCutBtn');
+  const undoLastCutBtn = $('undoLastCutBtn');
+  const cancelCutSelectionBtn = $('cancelCutSelectionBtn');
+  const pendingCutPanel = $('pendingCutPanel');
+  const pendingCutText = $('pendingCutText');
   const cutList = $('cutList');
   const noCutText = $('noCutText');
 
@@ -467,10 +498,10 @@
   // Cut sections array: [{ id, start, end }]
   let cutSections = [];
   let nextCutId = 1;
-  let selectedCutId = null;
+  let pendingCut = null;
 
   // Dragging state for waveform handles
-  let activeHandle = null; // 'start', 'end', or cut handle e.g. 'cut-1-start'
+  let activeHandle = null; // 'start', 'end', 'pending-start', or 'pending-end'
 
   // Format Time Helper
   function formatTime(seconds) {
@@ -652,6 +683,75 @@
     return model;
   }
 
+  // Build the waveform's visible timeline. Deleted ranges are removed from
+  // this timeline so the audio before and after every cut touches directly.
+  function buildDisplayTimeline() {
+    if (!audioBuffer) return { segments: [], duration: 0 };
+
+    const sourceDuration = audioBuffer.duration;
+    const sortedCuts = [...cutSections]
+      .filter(cut => cut.end > cut.start && cut.start < sourceDuration && cut.end > 0)
+      .sort((a, b) => a.start - b.start);
+    const sourceRanges = [];
+    let sourceCursor = 0;
+
+    sortedCuts.forEach(cut => {
+      const cutStart = Math.max(0, cut.start);
+      const cutEnd = Math.min(sourceDuration, cut.end);
+      if (cutStart > sourceCursor) sourceRanges.push([sourceCursor, cutStart]);
+      sourceCursor = Math.max(sourceCursor, cutEnd);
+    });
+    if (sourceCursor < sourceDuration) sourceRanges.push([sourceCursor, sourceDuration]);
+
+    let displayCursor = 0;
+    const segments = sourceRanges.map(([sourceStart, sourceEnd]) => {
+      const segment = {
+        sourceStart,
+        sourceEnd,
+        displayStart: displayCursor,
+        displayEnd: displayCursor + (sourceEnd - sourceStart)
+      };
+      displayCursor = segment.displayEnd;
+      return segment;
+    });
+
+    return { segments, duration: displayCursor };
+  }
+
+  function retainedSourceTimeToDisplayTime(sourceTime, timeline) {
+    for (const segment of timeline.segments) {
+      if (sourceTime >= segment.sourceStart && sourceTime < segment.sourceEnd) {
+        return segment.displayStart + (sourceTime - segment.sourceStart);
+      }
+    }
+    if (timeline.segments.length && sourceTime === audioBuffer.duration) {
+      return timeline.duration;
+    }
+    return null;
+  }
+
+  function sourceTimeToDisplayTime(sourceTime, timeline) {
+    if (!timeline.segments.length) return 0;
+    for (const segment of timeline.segments) {
+      if (sourceTime < segment.sourceStart) return segment.displayStart;
+      if (sourceTime <= segment.sourceEnd) {
+        return segment.displayStart + Math.max(0, sourceTime - segment.sourceStart);
+      }
+    }
+    return timeline.duration;
+  }
+
+  function displayTimeToSourceTime(displayTime, timeline) {
+    if (!timeline.segments.length) return 0;
+    const clampedTime = Math.max(0, Math.min(timeline.duration, displayTime));
+    for (const segment of timeline.segments) {
+      if (clampedTime < segment.displayEnd) {
+        return segment.sourceStart + (clampedTime - segment.displayStart);
+      }
+    }
+    return timeline.segments[timeline.segments.length - 1].sourceEnd;
+  }
+
   // Render Waveform Canvas
   function drawWaveform() {
     const width = waveCanvas.width / (window.devicePixelRatio || 1);
@@ -672,11 +772,13 @@
     }
 
     const duration = audioBuffer.duration;
+    const displayTimeline = buildDisplayTimeline();
+    const displayDuration = Math.max(displayTimeline.duration, 0.001);
     const sTime = Math.max(0, parseFloat(startTimeInput.value) || 0);
     const eTime = Math.min(duration, parseFloat(endTimeInput.value) || duration);
 
-    const sPos = (sTime / duration) * width;
-    const ePos = (eTime / duration) * width;
+    const sPos = (sourceTimeToDisplayTime(sTime, displayTimeline) / displayDuration) * width;
+    const ePos = (sourceTimeToDisplayTime(eTime, displayTimeline) / displayDuration) * width;
 
     // Out of range gray overlays
     ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
@@ -687,44 +789,40 @@
     ctx.fillStyle = 'rgba(37, 99, 235, 0.12)';
     ctx.fillRect(sPos, 0, ePos - sPos, height);
 
-    // Render Cut Sections (Red overlays)
-    cutSections.forEach(cut => {
-      const csPos = (Math.max(sTime, cut.start) / duration) * width;
-      const cePos = (Math.min(eTime, cut.end) / duration) * width;
-      if (cePos > csPos) {
-        const isSelected = cut.id === selectedCutId;
-        ctx.fillStyle = isSelected ? 'rgba(244, 63, 94, 0.36)' : 'rgba(244, 63, 94, 0.22)';
-        ctx.fillRect(csPos, 0, cePos - csPos, height);
-        
-        ctx.strokeStyle = isSelected ? '#fb7185' : '#f43f5e';
-        ctx.lineWidth = isSelected ? 2.5 : 1.5;
-        ctx.strokeRect(csPos, 0, cePos - csPos, height);
-      }
-    });
+    // Pending selection is shown in amber until the user presses Delete.
+    if (pendingCut) {
+      const pendingStartPos = (sourceTimeToDisplayTime(pendingCut.start, displayTimeline) / displayDuration) * width;
+      const pendingEndPos = (sourceTimeToDisplayTime(pendingCut.end, displayTimeline) / displayDuration) * width;
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.24)';
+      ctx.fillRect(pendingStartPos, 0, pendingEndPos - pendingStartPos, height);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(pendingStartPos, 0, pendingEndPos - pendingStartPos, height);
+    }
 
     // Draw Peaks (Waveform lines)
     const midY = height / 2;
-    const barWidth = width / peaks.length;
+    const sourceBarDuration = duration / peaks.length;
+    const barWidth = (sourceBarDuration / displayDuration) * width;
     const effectModel = getWaveformEffectModel();
 
     ctx.fillStyle = '#3b82f6';
     for (let i = 0; i < peaks.length; i++) {
-      const x = i * barWidth;
       const peak = peaks[i];
 
-      // Dim color if out of bounds or cut
+      // Deleted samples have no position on the collapsed display timeline.
       const timeAtX = ((i + 0.5) / peaks.length) * duration;
-      const isCut = cutSections.some(c => timeAtX >= c.start && timeAtX <= c.end);
+      const displayTime = retainedSourceTimeToDisplayTime(timeAtX, displayTimeline);
+      if (displayTime === null) continue;
+      const x = (displayTime / displayDuration) * width - barWidth / 2;
       const isTrimmedOut = timeAtX < sTime || timeAtX > eTime;
-      const adjustedPeak = (!isCut && !isTrimmedOut && effectModel)
+      const adjustedPeak = (!isTrimmedOut && effectModel)
         ? effectModel.adjustedPeak(timeAtX, peak)
         : null;
       const displayedPeak = adjustedPeak === null ? peak : adjustedPeak;
       const barHeight = Math.max(1, displayedPeak * (height * 0.42));
 
-      if (isCut) {
-        ctx.fillStyle = '#fb7185';
-      } else if (isTrimmedOut) {
+      if (isTrimmedOut) {
         ctx.fillStyle = '#334155';
       } else {
         ctx.fillStyle = '#60a5fa';
@@ -757,25 +855,20 @@
     ctx.arc(ePos, 16, 12, 0, Math.PI * 2); /* Increased handle size for touch */
     ctx.fill();
 
-    // Selected cut start/end handles. Placed at the bottom so they do not
-    // overlap with the blue trim handles at the top.
-    const selectedCut = cutSections.find(cut => cut.id === selectedCutId);
-    if (selectedCut) {
-      const cutStartPos = (selectedCut.start / duration) * width;
-      const cutEndPos = (selectedCut.end / duration) * width;
+    if (pendingCut) {
+      const pendingStartPos = (sourceTimeToDisplayTime(pendingCut.start, displayTimeline) / displayDuration) * width;
+      const pendingEndPos = (sourceTimeToDisplayTime(pendingCut.end, displayTimeline) / displayDuration) * width;
 
-      ctx.strokeStyle = '#fb7185';
-      ctx.fillStyle = '#f43f5e';
+      ctx.strokeStyle = '#fbbf24';
+      ctx.fillStyle = '#f59e0b';
       ctx.lineWidth = 3;
-
-      [cutStartPos, cutEndPos].forEach(pos => {
+      [pendingStartPos, pendingEndPos].forEach(pos => {
         ctx.beginPath();
         ctx.moveTo(pos, 0);
         ctx.lineTo(pos, height);
         ctx.stroke();
-
         ctx.beginPath();
-        ctx.arc(pos, height - 16, 13, 0, Math.PI * 2);
+        ctx.arc(pos, height - 16, 14, 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -783,14 +876,14 @@
       ctx.font = 'bold 13px sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('\u2194', cutStartPos, height - 16);
-      ctx.fillText('\u2194', cutEndPos, height - 16);
+      ctx.fillText('\u2194', pendingStartPos, height - 16);
+      ctx.fillText('\u2194', pendingEndPos, height - 16);
       ctx.textBaseline = 'alphabetic';
     }
 
     // Current Playhead Position (Green Line)
     if (currentTime >= 0) {
-      const playX = (currentTime / duration) * width;
+      const playX = (sourceTimeToDisplayTime(currentTime, displayTimeline) / displayDuration) * width;
       ctx.strokeStyle = '#34d399';
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -818,7 +911,8 @@
     const rect = waveCanvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
-    return (x / rect.width) * audioBuffer.duration;
+    const displayTimeline = buildDisplayTimeline();
+    return displayTimeToSourceTime((x / rect.width) * displayTimeline.duration, displayTimeline);
   }
 
   // Touch and Drag State
@@ -826,16 +920,27 @@
   let initialZoomLevel = 1;
   let isScrubbing = false;
 
-  function selectCut(cutId) {
-    selectedCutId = cutId;
-    renderCutList();
+  function updatePendingCutUI() {
+    if (pendingCut) {
+      pendingCutPanel.classList.remove('hidden');
+      pendingCutPanel.classList.add('flex');
+      pendingCutText.textContent = `${formatTime(pendingCut.start)} ～ ${formatTime(pendingCut.end)}（${(pendingCut.end - pendingCut.start).toFixed(1)}秒）`;
+      commitCutBtn.disabled = false;
+      addCutBtn.innerHTML = '<i class="fa-solid fa-vector-square"></i> 範囲を選び直す';
+    } else {
+      pendingCutPanel.classList.add('hidden');
+      pendingCutPanel.classList.remove('flex');
+      pendingCutText.textContent = '0:00.0 ～ 0:00.0';
+      commitCutBtn.disabled = true;
+      addCutBtn.innerHTML = '<i class="fa-solid fa-vector-square"></i> 範囲を選択';
+    }
   }
 
-  function updateCutInputs(cut) {
-    const item = cutList.querySelector(`[data-cut-id="${cut.id}"]`);
-    if (!item) return;
-    item.querySelector('.cut-start').value = cut.start.toFixed(1);
-    item.querySelector('.cut-end').value = cut.end.toFixed(1);
+  function cancelPendingCutSelection() {
+    pendingCut = null;
+    activeHandle = null;
+    updatePendingCutUI();
+    drawWaveform();
   }
 
   function pauseEditedPreviewForScrub() {
@@ -917,47 +1022,30 @@
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
     const duration = audioBuffer.duration;
+    const displayTimeline = buildDisplayTimeline();
+    const displayDuration = Math.max(displayTimeline.duration, 0.001);
 
     const sTime = parseFloat(startTimeInput.value) || 0;
     const eTime = parseFloat(endTimeInput.value) || duration;
 
-    const sPos = (sTime / duration) * rect.width;
-    const ePos = (eTime / duration) * rect.width;
+    const sPos = (sourceTimeToDisplayTime(sTime, displayTimeline) / displayDuration) * rect.width;
+    const ePos = (sourceTimeToDisplayTime(eTime, displayTimeline) / displayDuration) * rect.width;
 
     const hitThreshold = 30; // Increased hit area for touch (iPad)
 
-    // Cut handles take priority. Choose the closest edge so even a short cut
-    // can have both its start and end adjusted reliably on a touch screen.
-    const cutHandle = cutSections.flatMap(cut => [
-      { cut, edge: 'start', distance: Math.abs(x - (cut.start / duration) * rect.width) },
-      { cut, edge: 'end', distance: Math.abs(x - (cut.end / duration) * rect.width) }
-    ])
-      .filter(candidate => candidate.distance <= hitThreshold)
-      .sort((a, b) => {
-        if (a.distance !== b.distance) return a.distance - b.distance;
-        return Number(b.cut.id === selectedCutId) - Number(a.cut.id === selectedCutId);
-      })[0];
+    if (pendingCut) {
+      const pendingHandles = [
+        { edge: 'start', distance: Math.abs(x - (sourceTimeToDisplayTime(pendingCut.start, displayTimeline) / displayDuration) * rect.width) },
+        { edge: 'end', distance: Math.abs(x - (sourceTimeToDisplayTime(pendingCut.end, displayTimeline) / displayDuration) * rect.width) }
+      ].filter(candidate => candidate.distance <= hitThreshold)
+        .sort((a, b) => a.distance - b.distance);
 
-    if (cutHandle) {
-      selectedCutId = cutHandle.cut.id;
-      activeHandle = `cut-${cutHandle.cut.id}-${cutHandle.edge}`;
-      isScrubbing = false;
-      e.preventDefault();
-      renderCutList();
-      return;
-    }
-
-    // Tapping inside a red area selects that cut. A second touch near either
-    // red edge can then drag it, which is easier on a small iPad screen.
-    const tappedTime = (x / rect.width) * duration;
-    const tappedCut = [...cutSections].reverse().find(cut => tappedTime >= cut.start && tappedTime <= cut.end);
-    if (tappedCut && tappedCut.id !== selectedCutId) {
-      selectedCutId = tappedCut.id;
-      activeHandle = null;
-      isScrubbing = false;
-      e.preventDefault();
-      renderCutList();
-      return;
+      if (pendingHandles.length) {
+        activeHandle = `pending-${pendingHandles[0].edge}`;
+        isScrubbing = false;
+        e.preventDefault();
+        return;
+      }
     }
 
     if (Math.abs(x - sPos) <= hitThreshold) {
@@ -969,7 +1057,7 @@
       // playing, pause it during the drag and resume when the finger lifts.
       activeHandle = null;
       isScrubbing = true;
-      const clickTime = (x / rect.width) * duration;
+      const clickTime = displayTimeToSourceTime((x / rect.width) * displayTimeline.duration, displayTimeline);
       beginWaveformScrub(clickTime);
     }
   }
@@ -1004,31 +1092,32 @@
     let editRangeChanged = false;
 
     if (activeHandle === 'start') {
+      if (pendingCut) {
+        pendingCut = null;
+        updatePendingCutUI();
+      }
       const curEnd = parseFloat(endTimeInput.value) || duration;
       const newStart = Math.max(0, Math.min(t, curEnd - 0.1));
       startTimeInput.value = newStart.toFixed(1);
       editRangeChanged = true;
     } else if (activeHandle === 'end') {
+      if (pendingCut) {
+        pendingCut = null;
+        updatePendingCutUI();
+      }
       const curStart = parseFloat(startTimeInput.value) || 0;
       const newEnd = Math.min(duration, Math.max(t, curStart + 0.1));
       endTimeInput.value = newEnd.toFixed(1);
       editRangeChanged = true;
-    } else if (activeHandle && activeHandle.startsWith('cut-')) {
-      const match = activeHandle.match(/^cut-(\d+)-(start|end)$/);
-      if (match) {
-        const cut = cutSections.find(c => c.id === Number(match[1]));
-        if (cut) {
-          const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
-          const trimEnd = Math.min(duration, parseFloat(endTimeInput.value) || duration);
-          if (match[2] === 'start') {
-            cut.start = Math.max(trimStart, Math.min(t, cut.end - 0.1));
-          } else {
-            cut.end = Math.min(trimEnd, Math.max(t, cut.start + 0.1));
-          }
-          updateCutInputs(cut);
-          editRangeChanged = true;
-        }
+    } else if (activeHandle && activeHandle.startsWith('pending-') && pendingCut) {
+      const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
+      const trimEnd = Math.min(duration, parseFloat(endTimeInput.value) || duration);
+      if (activeHandle === 'pending-start') {
+        pendingCut.start = Math.max(trimStart, Math.min(t, pendingCut.end - 0.1));
+      } else {
+        pendingCut.end = Math.min(trimEnd, Math.max(t, pendingCut.start + 0.1));
       }
+      updatePendingCutUI();
     } else if (isScrubbing) {
       moveWaveformScrub(t);
     }
@@ -1095,7 +1184,7 @@
 
     cutSections = [];
     nextCutId = 1;
-    selectedCutId = null;
+    pendingCut = null;
     activeHandle = null;
     isScrubbing = false;
     scrubResumeMode = null;
@@ -1129,9 +1218,10 @@
     statusText.textContent = '';
     hideProgress();
 
-    [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, exportBtn].forEach(button => {
+    [playPauseBtn, stopBtn, setStartBtn, setEndBtn, previewEditedBtn, addCutBtn, commitCutBtn, undoLastCutBtn, exportBtn].forEach(button => {
       button.disabled = true;
     });
+    updatePendingCutUI();
     setOriginalButtonPlaying(false);
     setEditedButtonPlaying(false);
     setPlaybackState('idle', '音声ファイルを選択してください');
@@ -1183,10 +1273,11 @@
       // A newly loaded file starts with a clean cut list.
       cutSections = [];
       nextCutId = 1;
-      selectedCutId = null;
+      pendingCut = null;
       currentTime = 0;
       editedPreviewBuffer = null;
       editedTimeline = [];
+      updatePendingCutUI();
       renderCutList();
 
       if (sourceObjectUrl) URL.revokeObjectURL(sourceObjectUrl);
@@ -1280,6 +1371,7 @@
   // Set Start/End From Current Head
   setStartBtn.addEventListener('click', () => {
     if (!audioBuffer) return;
+    if (pendingCut) cancelPendingCutSelection();
     const end = parseFloat(endTimeInput.value) || audioBuffer.duration;
     const newStart = Math.min(currentTime, end - 0.1);
     startTimeInput.value = newStart.toFixed(1);
@@ -1289,6 +1381,7 @@
 
   setEndBtn.addEventListener('click', () => {
     if (!audioBuffer) return;
+    if (pendingCut) cancelPendingCutSelection();
     const start = parseFloat(startTimeInput.value) || 0;
     const newEnd = Math.max(currentTime, start + 0.1);
     endTimeInput.value = newEnd.toFixed(1);
@@ -1297,72 +1390,40 @@
   });
 
   // Dynamic Cut Sections Management
+  function undoCut(cutId) {
+    const beforeCount = cutSections.length;
+    cutSections = cutSections.filter(cut => cut.id !== cutId);
+    if (cutSections.length === beforeCount) return;
+    stopEditedPreview();
+    setPlaybackState('idle', '削除した範囲を元に戻しました');
+    renderCutList();
+  }
+
   function renderCutList() {
     cutList.innerHTML = '';
+    undoLastCutBtn.disabled = cutSections.length === 0;
     if (cutSections.length === 0) {
-      selectedCutId = null;
       cutList.appendChild(noCutText);
       drawWaveform();
       return;
     }
 
-    if (!cutSections.some(cut => cut.id === selectedCutId)) {
-      selectedCutId = cutSections[0].id;
-    }
-
     cutSections.forEach((cut, index) => {
       const item = document.createElement('div');
       item.dataset.cutId = cut.id;
-      const isSelected = cut.id === selectedCutId;
-      item.className = `flex items-center gap-2 bg-slate-950 border rounded-xl p-2.5 text-xs cursor-pointer transition ${isSelected ? 'border-rose-400 ring-1 ring-rose-400/50' : 'border-slate-800 hover:border-slate-700'}`;
+      item.className = 'flex items-center gap-3 bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs';
       item.innerHTML = `
-        <span class="font-bold text-rose-400">#${index + 1}${isSelected ? '<span class="block text-[9px] text-rose-300">選択中</span>' : ''}</span>
-        <div class="grid grid-cols-2 gap-2 flex-1">
-          <div>
-            <span class="text-[10px] text-slate-500 block">開始(秒)</span>
-            <input type="number" step="0.1" value="${cut.start.toFixed(1)}" class="cut-start w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200" />
-          </div>
-          <div>
-            <span class="text-[10px] text-slate-500 block">終了(秒)</span>
-            <input type="number" step="0.1" value="${cut.end.toFixed(1)}" class="cut-end w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 font-mono text-slate-200" />
-          </div>
+        <span class="w-6 h-6 shrink-0 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center font-bold">${index + 1}</span>
+        <div class="flex-1 min-w-0">
+          <div class="font-bold text-slate-200">削除済み</div>
+          <div class="font-mono text-slate-400">${formatTime(cut.start)} ～ ${formatTime(cut.end)}（${(cut.end - cut.start).toFixed(1)}秒）</div>
         </div>
-        <button class="remove-cut text-slate-500 hover:text-rose-400 px-2 py-1 transition" title="削除">
-          <i class="fa-solid fa-trash-can"></i>
+        <button class="undo-cut shrink-0 px-2.5 py-2 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition" title="この削除を取り消して音声を戻す">
+          <i class="fa-solid fa-rotate-left"></i>
+          <span class="ml-1">元に戻す</span>
         </button>
       `;
-
-      item.addEventListener('click', (e) => {
-        if (e.target.closest('.remove-cut')) return;
-        if (selectedCutId !== cut.id) selectCut(cut.id);
-      });
-
-      item.querySelector('.cut-start').addEventListener('change', (e) => {
-        const trimStart = Math.max(0, parseFloat(startTimeInput.value) || 0);
-        cut.start = Math.max(trimStart, Math.min(parseFloat(e.target.value) || trimStart, cut.end - 0.1));
-        e.target.value = cut.start.toFixed(1);
-        selectedCutId = cut.id;
-        stopEditedPreview();
-        renderCutList();
-      });
-
-      item.querySelector('.cut-end').addEventListener('change', (e) => {
-        const trimEnd = Math.min(audioBuffer.duration, parseFloat(endTimeInput.value) || audioBuffer.duration);
-        cut.end = Math.min(trimEnd, Math.max(cut.start + 0.1, parseFloat(e.target.value) || cut.start + 0.1));
-        e.target.value = cut.end.toFixed(1);
-        selectedCutId = cut.id;
-        stopEditedPreview();
-        renderCutList();
-      });
-
-      item.querySelector('.remove-cut').addEventListener('click', () => {
-        cutSections = cutSections.filter(c => c.id !== cut.id);
-        if (selectedCutId === cut.id) {
-          selectedCutId = cutSections.length ? cutSections[0].id : null;
-        }
-        stopEditedPreview();
-        renderCutList();
-      });
+      item.querySelector('.undo-cut').addEventListener('click', () => undoCut(cut.id));
 
       cutList.appendChild(item);
     });
@@ -1375,25 +1436,52 @@
     const duration = audioBuffer.duration;
     const s = parseFloat(startTimeInput.value) || 0;
     const e = parseFloat(endTimeInput.value) || duration;
+    const availableLength = Math.max(0.1, e - s);
+    const selectionLength = Math.max(0.1, Math.min(5, availableLength * 0.2));
+    let center = currentTime;
+    if (center <= s + 0.1 || center >= e - 0.1) center = s + availableLength / 2;
+    let selectionStart = Math.max(s, center - selectionLength / 2);
+    let selectionEnd = Math.min(e, selectionStart + selectionLength);
+    selectionStart = Math.max(s, selectionEnd - selectionLength);
 
-    const defaultCutStart = s + (e - s) * 0.4;
-    const defaultCutEnd = s + (e - s) * 0.6;
-
-    const newCut = {
-      id: nextCutId++,
-      start: parseFloat(defaultCutStart.toFixed(1)),
-      end: parseFloat(defaultCutEnd.toFixed(1))
+    pendingCut = {
+      start: parseFloat(selectionStart.toFixed(1)),
+      end: parseFloat(selectionEnd.toFixed(1))
     };
-    cutSections.push(newCut);
-    selectedCutId = newCut.id;
 
     stopEditedPreview();
+    updatePendingCutUI();
     renderCutList();
+  });
+
+  commitCutBtn.addEventListener('click', () => {
+    if (!audioBuffer || !pendingCut) return;
+    const newCut = {
+      id: nextCutId++,
+      start: pendingCut.start,
+      end: pendingCut.end
+    };
+    cutSections.push(newCut);
+    pendingCut = null;
+    stopEditedPreview();
+    updatePendingCutUI();
+    setPlaybackState('idle', '選択した範囲を削除しました');
+    renderCutList();
+  });
+
+  cancelCutSelectionBtn.addEventListener('click', cancelPendingCutSelection);
+  undoLastCutBtn.addEventListener('click', () => {
+    if (!cutSections.length) return;
+    undoCut(cutSections[cutSections.length - 1].id);
   });
 
   // Inputs Change Listener
   [startTimeInput, endTimeInput, fadeInInput, fadeOutInput].forEach(el => {
     el.addEventListener('input', () => {
+      if ((el === startTimeInput || el === endTimeInput) && pendingCut) {
+        pendingCut = null;
+        updatePendingCutUI();
+      }
       stopEditedPreview();
       drawWaveform();
     });
